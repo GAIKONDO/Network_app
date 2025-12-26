@@ -89,7 +89,7 @@ const relationEmbeddingGenerationInProgress = new Set<string>();
  */
 export async function saveRelationEmbeddingAsync(
   relationId: string,
-  topicId: string,
+  topicId: string | null | undefined,
   organizationId: string
 ): Promise<boolean> {
   if (typeof window === 'undefined') {
@@ -108,8 +108,10 @@ export async function saveRelationEmbeddingAsync(
       return false;
     }
     
+    // Graphvizのリレーションの場合、topicIdはnullになるが、空文字列として扱う
+    const topicIdForEmbedding = topicId || '';
     const orgOrCompanyId = relation.companyId || organizationId || relation.organizationId || '';
-    await saveRelationEmbedding(relationId, topicId, orgOrCompanyId, relation);
+    await saveRelationEmbedding(relationId, topicIdForEmbedding, orgOrCompanyId, relation);
     return true;
   } catch (error: any) {
     console.error(`リレーション ${relationId} の埋め込み生成エラー:`, error?.message || error);
@@ -320,7 +322,9 @@ export async function batchUpdateRelationEmbeddings(
           }
         }
 
-        const result = await saveRelationEmbeddingAsync(relationId, relation.topicId, orgOrCompanyId);
+        // Graphvizのリレーションの場合、topicIdはnullになるが、空文字列として扱う
+        const topicIdForEmbedding = relation.topicId || '';
+        const result = await saveRelationEmbeddingAsync(relationId, topicIdForEmbedding, orgOrCompanyId);
         const current = ++processedCount;
         
         if (result) {
@@ -387,7 +391,9 @@ export async function regenerateOutdatedRelationEmbeddings(
           continue;
         }
         
-        await saveRelationEmbedding(relationId, relation.topicId, relation.organizationId, relation);
+        // Graphvizのリレーションの場合、topicIdはnullになるが、空文字列として扱う
+        const topicIdForEmbedding = relation.topicId || '';
+        await saveRelationEmbedding(relationId, topicIdForEmbedding, relation.organizationId, relation);
         regenerated++;
         onProgress?.(i + 1, outdated.length, relationId, 'success');
         

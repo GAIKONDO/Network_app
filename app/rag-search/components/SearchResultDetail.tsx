@@ -1,7 +1,10 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import type { KnowledgeGraphSearchResult } from '@/lib/knowledgeGraphRAG';
 import { entityTypeLabels, relationTypeLabels } from '../constants/labels';
+import { callTauriCommand } from '@/lib/localFirebase';
+import { getMeetingNoteById } from '@/lib/orgApi';
 
 interface SearchResultDetailProps {
   result: KnowledgeGraphSearchResult;
@@ -9,6 +12,36 @@ interface SearchResultDetailProps {
 }
 
 export default function SearchResultDetail({ result, onClose }: SearchResultDetailProps) {
+  const router = useRouter();
+
+  const handleShowInMeeting = async () => {
+    if (result.meetingNoteId) {
+      // Graphvizトピックの場合はGraphvizページへ
+      if (result.meetingNoteId.startsWith('graphviz_')) {
+        const yamlFileId = result.meetingNoteId.replace('graphviz_', '');
+        if (result.topic?.organizationId) {
+          router.push(`/graphviz?fileId=${yamlFileId}&organizationId=${result.topic.organizationId}&tab=tab0`);
+        } else {
+          alert('組織IDが取得できませんでした');
+        }
+        return;
+      }
+
+      // 通常の議事録トピックの場合
+      try {
+        const meetingNote = await getMeetingNoteById(result.meetingNoteId);
+        if (meetingNote && meetingNote.organizationId) {
+          router.push(`/organization/meeting?organizationId=${meetingNote.organizationId}&meetingId=${result.meetingNoteId}`);
+        } else {
+          alert('議事録の組織IDが取得できませんでした');
+        }
+      } catch (error) {
+        console.error('議事録の取得エラー:', error);
+        alert('議事録の取得に失敗しました');
+      }
+    }
+  };
+
   return (
     <div style={{
       backgroundColor: '#FFFFFF',
@@ -104,9 +137,41 @@ export default function SearchResultDetail({ result, onClose }: SearchResultDeta
 
       {result.type === 'topic' && (
         <div>
-          <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#1F2937', marginBottom: '12px' }}>
-            {result.topic?.title || 'トピック'}
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#1F2937', margin: 0 }}>
+              {result.topic?.title || 'トピック'}
+            </h3>
+            {result.meetingNoteId && (
+              <button
+                onClick={handleShowInMeeting}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: 'transparent',
+                  color: '#3B82F6',
+                  border: '1px solid #3B82F6',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.2s ease',
+                  boxShadow: 'none',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                  e.currentTarget.style.color = '#FFFFFF';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#3B82F6';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+                title={result.meetingNoteId.startsWith('graphviz_') ? 'Graphvizページで表示' : '議事録ページで表示'}
+              >
+                {result.meetingNoteId.startsWith('graphviz_') ? 'Graphvizで表示' : '議事録で表示'}
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {result.topic?.contentSummary && (
               <div>
@@ -156,6 +221,81 @@ export default function SearchResultDetail({ result, onClose }: SearchResultDeta
                 <div>
                   <span style={{ fontSize: '14px', fontWeight: 500, color: '#6B7280' }}>組織ID: </span>
                   <span style={{ fontSize: '14px', color: '#1F2937' }}>{result.topic.organizationId}</span>
+                </div>
+              )}
+              {result.topic?.files && result.topic.files.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 500, color: '#6B7280', marginBottom: '8px' }}>
+                    📎 関連ファイル ({result.topic.files.length}件)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {result.topic.files.map((file, idx) => {
+                      const handleFileClick = async () => {
+                        try {
+                          // URLの場合はそのまま開く
+                          if (file.filePath.startsWith('http://') || file.filePath.startsWith('https://')) {
+                            window.open(file.filePath, '_blank', 'noopener,noreferrer');
+                            return;
+                          }
+                          
+                          // ローカルファイルの場合はTauriコマンドを使用
+                          const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+                          if (isTauri) {
+                            // file://プロトコルを除去
+                            const cleanPath = file.filePath.replace(/^file:\/\//, '');
+                            const result = await callTauriCommand('open_file', { filePath: cleanPath });
+                            if (!result || !result.success) {
+                              alert(`ファイルを開くことができませんでした: ${result?.error || '不明なエラー'}`);
+                            }
+                          } else {
+                            // ブラウザ環境の場合はfile://リンクを試す
+                            const url = file.filePath.startsWith('file://') ? file.filePath : `file://${file.filePath}`;
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          }
+                        } catch (error: any) {
+                          console.error('ファイルを開くエラー:', error);
+                          alert(`ファイルを開くことができませんでした: ${error?.message || '不明なエラー'}`);
+                        }
+                      };
+                      
+                      return (
+                        <div key={idx} style={{
+                          padding: '8px',
+                          backgroundColor: '#F9FAFB',
+                          borderRadius: '6px',
+                          border: '1px solid #E5E7EB',
+                        }}>
+                          <button
+                            onClick={handleFileClick}
+                            style={{
+                              fontSize: '14px',
+                              color: '#3B82F6',
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              fontWeight: 500,
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              font: 'inherit',
+                              textAlign: 'left',
+                            }}
+                          >
+                            {file.fileName}
+                          </button>
+                          {file.description && (
+                            <p style={{ fontSize: '12px', color: '#6B7280', margin: '4px 0 0 0' }}>
+                              {file.description}
+                            </p>
+                          )}
+                          {file.mimeType && (
+                            <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '2px 0 0 0' }}>
+                              タイプ: {file.mimeType}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

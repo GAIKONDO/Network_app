@@ -76,12 +76,16 @@ export async function createRelation(relation: CreateRelationInput): Promise<Rel
       });
       
       // 埋め込みを非同期で生成（エラーは無視）
+      // Graphvizのリレーションの場合、topicIdはnullになるが、空文字列として扱う
       if (relation.organizationId) {
-        saveRelationEmbeddingAsync(id, relation.topicId, relation.organizationId).catch(error => {
+        const topicIdForEmbedding = relation.topicId || '';
+        saveRelationEmbeddingAsync(id, topicIdForEmbedding, relation.organizationId).catch(error => {
           console.error('❌ [createRelation] リレーション埋め込みの生成に失敗しました（続行します）:', {
             relationId: id,
             relationType: relation.relationType,
             topicId: relation.topicId,
+            topicIdForEmbedding,
+            yamlFileId: relation.yamlFileId,
             organizationId: relation.organizationId,
             error: error?.message || String(error),
             stack: error?.stack,

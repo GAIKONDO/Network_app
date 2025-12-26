@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import type { KnowledgeGraphSearchResult } from '@/lib/knowledgeGraphRAG';
 import { getMeetingNoteById } from '@/lib/orgApi';
+import { callTauriCommand } from '@/lib/localFirebase';
 
 interface SearchResultItemProps {
   result: KnowledgeGraphSearchResult;
@@ -61,6 +62,18 @@ export default function SearchResultItem({
   const handleShowInMeeting = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (result.meetingNoteId) {
+      // Graphvizトピックの場合はGraphvizページへ
+      if (result.meetingNoteId.startsWith('graphviz_')) {
+        const yamlFileId = result.meetingNoteId.replace('graphviz_', '');
+        if (result.topic?.organizationId) {
+          router.push(`/graphviz?fileId=${yamlFileId}&organizationId=${result.topic.organizationId}&tab=tab0`);
+        } else {
+          alert('組織IDが取得できませんでした');
+        }
+        return;
+      }
+
+      // 通常の議事録トピックの場合
       try {
         // 議事録から組織IDを取得
         const meetingNote = await getMeetingNoteById(result.meetingNoteId);
@@ -187,16 +200,26 @@ export default function SearchResultItem({
                     onClick={handleShowInMeeting}
                     style={{
                       padding: '4px 8px',
-                      backgroundColor: '#3B82F6',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '4px',
+                      backgroundColor: 'transparent',
+                      color: '#3B82F6',
+                      border: '1px solid #3B82F6',
+                      borderRadius: '6px',
                       fontSize: '12px',
                       cursor: 'pointer',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
                     }}
-                    title="議事録ページで表示"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
+                      e.currentTarget.style.color = '#FFFFFF';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#3B82F6';
+                    }}
+                    title={result.meetingNoteId.startsWith('graphviz_') ? 'Graphvizページで表示' : '議事録ページで表示'}
                   >
-                    議事録で表示
+                    {result.meetingNoteId.startsWith('graphviz_') ? 'Graphvizで表示' : '議事録で表示'}
                   </button>
                 )}
               </div>
@@ -209,6 +232,64 @@ export default function SearchResultItem({
                 <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0 0' }}>
                   カテゴリ: {result.topic.semanticCategory}
                 </p>
+              )}
+              {result.topic?.files && result.topic.files.length > 0 && (
+                <div style={{ marginTop: '8px' }}>
+                  <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0 0', fontWeight: 500 }}>
+                    📎 関連ファイル ({result.topic.files.length}件):
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                    {result.topic.files.map((file, idx) => {
+                      const handleFileClick = async (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        try {
+                          // URLの場合はそのまま開く
+                          if (file.filePath.startsWith('http://') || file.filePath.startsWith('https://')) {
+                            window.open(file.filePath, '_blank', 'noopener,noreferrer');
+                            return;
+                          }
+                          
+                          // ローカルファイルの場合はTauriコマンドを使用
+                          const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+                          if (isTauri) {
+                            // file://プロトコルを除去
+                            const cleanPath = file.filePath.replace(/^file:\/\//, '');
+                            const result = await callTauriCommand('open_file', { filePath: cleanPath });
+                            if (!result || !result.success) {
+                              alert(`ファイルを開くことができませんでした: ${result?.error || '不明なエラー'}`);
+                            }
+                          } else {
+                            // ブラウザ環境の場合はfile://リンクを試す
+                            const url = file.filePath.startsWith('file://') ? file.filePath : `file://${file.filePath}`;
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          }
+                        } catch (error: any) {
+                          console.error('ファイルを開くエラー:', error);
+                          alert(`ファイルを開くことができませんでした: ${error?.message || '不明なエラー'}`);
+                        }
+                      };
+                      
+                      return (
+                        <button
+                          key={idx}
+                          onClick={handleFileClick}
+                          style={{
+                            fontSize: '11px',
+                            color: '#3B82F6',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            font: 'inherit',
+                          }}
+                        >
+                          {file.fileName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           )}

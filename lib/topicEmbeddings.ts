@@ -32,6 +32,57 @@ export async function saveTopicEmbedding(
     throw new Error('トピック埋め込みの保存はクライアント側でのみ実行可能です');
   }
   
+  // Graphvizのトピックの場合は、専用の関数を使用
+  if (meetingNoteId && meetingNoteId.startsWith('graphviz_')) {
+    console.log('📊 [saveTopicEmbedding] Graphvizトピックを検出。専用の保存関数を使用します:', {
+      topicId,
+      meetingNoteId,
+    });
+    
+    try {
+      const { saveGraphvizCardEmbeddingToChroma } = await import('./graphvizCardEmbeddings');
+      // Graphvizのトピックの場合は、yamlFileIdを抽出（meetingNoteIdから`graphviz_`を除去）
+      const yamlFileId = meetingNoteId.replace('graphviz_', '');
+      
+      // topicsテーブルからGraphvizのメタデータを取得
+      const { callTauriCommand } = await import('./localFirebase');
+      const embeddingId = `${meetingNoteId}-topic-${topicId}`;
+      let yamlType: string | undefined;
+      let description: string | undefined;
+      
+      try {
+        const topicDoc = await callTauriCommand('doc_get', {
+          collectionName: 'topics',
+          docId: embeddingId,
+        });
+        if (topicDoc?.exists && topicDoc?.data) {
+          yamlType = topicDoc.data.yamlType;
+          description = topicDoc.data.description;
+        }
+      } catch (error) {
+        console.warn('⚠️ [saveTopicEmbedding] Graphvizトピックのメタデータ取得に失敗（続行）:', error);
+      }
+      
+      await saveGraphvizCardEmbeddingToChroma(
+        yamlFileId,
+        organizationId,
+        title,
+        content,
+        {
+          semanticCategory: metadata?.semanticCategory,
+          keywords: metadata?.keywords as string[] | undefined,
+          summary: metadata?.summary,
+          description: description,
+          yamlType: yamlType,
+        }
+      );
+      return;
+    } catch (error) {
+      console.error('❌ [saveTopicEmbedding] Graphvizトピックの保存に失敗。通常の方法にフォールバック:', error);
+      // エラーが発生した場合は通常の方法にフォールバック
+    }
+  }
+  
   try {
     const now = new Date().toISOString();
     const embeddingVersion = metadata ? '2.0' : '1.0';

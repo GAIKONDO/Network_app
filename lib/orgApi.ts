@@ -2694,6 +2694,12 @@ export async function getTopicsByMeetingNote(meetingNoteId: string): Promise<Top
   try {
     console.log('📖 [getTopicsByMeetingNote] 開始:', { meetingNoteId });
     
+    // Graphvizのトピックの場合は早期リターン（議事録ではないため）
+    if (meetingNoteId && meetingNoteId.startsWith('graphviz_')) {
+      console.log('📖 [getTopicsByMeetingNote] Graphvizトピックのため、スキップします:', meetingNoteId);
+      return [];
+    }
+    
     const meetingNote = await getMeetingNoteById(meetingNoteId);
     if (!meetingNote) {
       console.warn('⚠️ [getTopicsByMeetingNote] 議事録が見つかりません:', meetingNoteId);
@@ -2954,8 +2960,12 @@ export async function getAllTopicsBatch(): Promise<TopicInfo[]> {
           }
         }
         
+        // topicsテーブルのid（embeddingId）を取得
+        // idは{meetingNoteId}-topic-{topicId}形式
+        const topicIdInDb = item.id || topicData.id || `${topicData.meetingNoteId || `graphviz_${topicData.topicId}`}-topic-${topicData.topicId}`;
+        
         allTopics.push({
-          id: topicData.topicId,
+          id: topicData.topicId, // 表示用のID（yamlFileId）
           title: topicData.title,
           content: topicData.content || '',
           meetingNoteId: topicData.meetingNoteId || `graphviz_${topicData.topicId}`,
@@ -2969,7 +2979,9 @@ export async function getAllTopicsBatch(): Promise<TopicInfo[]> {
           importance: topicData.importance as TopicInfo['importance'],
           keywords,
           summary: topicData.description || topicData.contentSummary,
-        });
+          // topicsテーブルのidを保持（topicFilesテーブルのtopicIdと一致させるため）
+          _dbId: topicIdInDb,
+        } as TopicInfo & { _dbId?: string });
       }
     } catch (graphvizError) {
       console.warn('⚠️ [getAllTopicsBatch] Graphvizカードのトピック取得エラー:', graphvizError);

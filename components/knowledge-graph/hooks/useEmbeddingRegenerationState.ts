@@ -164,14 +164,17 @@ export function useEmbeddingRegenerationState({
       const targetEntities = selectedOrgId === 'all'
         ? entities.filter(e => e.organizationId)
         : entities.filter(e => e.organizationId === selectedOrgId);
+      // Graphvizのリレーション（yamlFileIdが設定されている）の場合はtopicIdがnullでもOK
       const targetRelations = selectedOrgId === 'all'
         ? relations.filter(r => {
             const orgId = r.organizationId || entities.find(e => e.id === r.sourceEntityId || e.id === r.targetEntityId)?.organizationId;
-            return orgId && r.topicId;
+            // topicIdまたはyamlFileIdがあるもののみ（Graphvizのリレーションも含む）
+            return orgId && (r.topicId || r.yamlFileId);
           })
         : relations.filter(r => {
             const orgId = r.organizationId || entities.find(e => e.id === r.sourceEntityId || e.id === r.targetEntityId)?.organizationId;
-            return orgId === selectedOrgId && r.topicId;
+            // topicIdまたはyamlFileIdがあるもののみ（Graphvizのリレーションも含む）
+            return orgId === selectedOrgId && (r.topicId || r.yamlFileId);
           });
       const targetTopics = selectedOrgId === 'all'
         ? topics.filter(t => t.organizationId)
@@ -268,6 +271,7 @@ export function useEmbeddingRegenerationState({
           console.log(`📊 [未生成件数計算] chromaSynced=0またはnullのリレーション: ${missingRelationDocs.length}件`);
           
           // 組織フィルタリングを考慮
+          // Graphvizのリレーション（yamlFileIdが設定されている）の場合はtopicIdがnullでもOK
           let filteredMissingRelations = missingRelationDocs;
           if (selectedOrgId !== 'all') {
             filteredMissingRelations = missingRelationDocs.filter(doc => {
@@ -275,12 +279,14 @@ export function useEmbeddingRegenerationState({
               // organizationIdが直接設定されているか、エンティティから取得
               const orgId = relationData.organizationId || 
                 entities.find(e => e.id === relationData.sourceEntityId || e.id === relationData.targetEntityId)?.organizationId;
-              return orgId === selectedOrgId && relationData.topicId;
+              // topicIdまたはyamlFileIdがあるもののみ（Graphvizのリレーションも含む）
+              return orgId === selectedOrgId && (relationData.topicId || relationData.yamlFileId);
             });
           } else {
             filteredMissingRelations = missingRelationDocs.filter(doc => {
               const relationData = doc.data || doc;
-              return relationData.topicId; // topicIdがあるもののみ
+              // topicIdまたはyamlFileIdがあるもののみ（Graphvizのリレーションも含む）
+              return relationData.topicId || relationData.yamlFileId;
             });
           }
           

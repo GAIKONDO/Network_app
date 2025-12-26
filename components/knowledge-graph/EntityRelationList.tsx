@@ -1,8 +1,10 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import type { Entity } from '@/types/entity';
 import type { Relation } from '@/types/relation';
 import type { TopicInfo } from '@/lib/orgApi';
+import { getTopicFilesByTopicIds } from '@/lib/topicApi';
 
 interface EntityRelationListProps {
   entities: Entity[];
@@ -83,6 +85,77 @@ export default function EntityRelationList({
   setShowDeleteEntityModal,
   setShowBulkDeleteModal,
 }: EntityRelationListProps) {
+  // トピックのファイル件数を管理
+  const [topicFileCounts, setTopicFileCounts] = useState<Map<string, number>>(new Map());
+  
+  // 表示されているトピックのファイル件数を取得
+  useEffect(() => {
+    const fetchTopicFileCounts = async () => {
+      if (paginatedTopics.length === 0) {
+        return;
+      }
+      
+      try {
+        // トピックIDを{meetingNoteId}-topic-{topicId}形式に変換
+        // Graphvizカードの場合は_dbIdを使用（topicsテーブルのidと一致）
+        const topicIdsForFiles = paginatedTopics
+          .filter(topic => topic.meetingNoteId && topic.id)
+          .map(topic => {
+            // _dbIdが存在する場合はそれを使用（Graphvizカードの場合）
+            const topicIdForFiles = (topic as any)._dbId || `${topic.meetingNoteId}-topic-${topic.id}`;
+            console.log('[EntityRelationList] トピックID変換:', {
+              topicId: topic.id,
+              meetingNoteId: topic.meetingNoteId,
+              topicIdForFiles,
+              title: topic.title,
+              hasDbId: !!(topic as any)._dbId,
+            });
+            return topicIdForFiles;
+          });
+        
+        console.log('[EntityRelationList] ファイル件数取得開始:', {
+          topicsCount: paginatedTopics.length,
+          topicIdsForFilesCount: topicIdsForFiles.length,
+          topicIdsForFiles,
+        });
+        
+        if (topicIdsForFiles.length === 0) {
+          console.warn('[EntityRelationList] トピックIDが空です');
+          return;
+        }
+        
+        // ファイル情報を一括取得
+        const files = await getTopicFilesByTopicIds(topicIdsForFiles);
+        
+        console.log('[EntityRelationList] ファイル取得結果:', {
+          filesCount: files.length,
+          files: files.map(f => ({
+            id: f.id,
+            topicId: f.topicId,
+            fileName: f.fileName,
+          })),
+        });
+        
+        // トピックIDをキーにしたファイル件数のマップを作成
+        const countsMap = new Map<string, number>();
+        for (const file of files) {
+          const count = countsMap.get(file.topicId) || 0;
+          countsMap.set(file.topicId, count + 1);
+        }
+        
+        console.log('[EntityRelationList] ファイル件数マップ:', {
+          countsMapSize: countsMap.size,
+          counts: Array.from(countsMap.entries()),
+        });
+        
+        setTopicFileCounts(countsMap);
+      } catch (error) {
+        console.error('[EntityRelationList] トピックファイル件数の取得エラー:', error);
+      }
+    };
+    
+    fetchTopicFileCounts();
+  }, [paginatedTopics]);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* エンティティセクション */}
@@ -534,6 +607,24 @@ export default function EntityRelationList({
             // このトピックに関連するリレーション数を取得
             const relatedRelationsCount = relations.filter(r => r.topicId === topic.id).length;
             
+            // このトピックに紐づくファイル件数を取得
+            const topicIdForFiles = topic.meetingNoteId && topic.id 
+              ? `${topic.meetingNoteId}-topic-${topic.id}`
+              : null;
+            const fileCount = topicIdForFiles ? (topicFileCounts.get(topicIdForFiles) || 0) : 0;
+            
+            // デバッグログ（開発時のみ）
+            if (process.env.NODE_ENV === 'development' && topicIdForFiles) {
+              console.log('[EntityRelationList] トピック表示:', {
+                topicId: topic.id,
+                meetingNoteId: topic.meetingNoteId,
+                topicIdForFiles,
+                fileCount,
+                hasInMap: topicFileCounts.has(topicIdForFiles),
+                allKeys: Array.from(topicFileCounts.keys()),
+              });
+            }
+            
             return (
               <div
                 key={topic.id}
@@ -548,7 +639,8 @@ export default function EntityRelationList({
                 <div style={{ color: '#1a1a1a', fontWeight: 600, marginBottom: '4px' }}>
                   📝 {topic.title || 'タイトルなし'}
                 </div>
-                {topic.meetingNoteTitle && (
+                {/* Graphvizカードのトピックの場合は議事録情報を表示しない */}
+                {topic.meetingNoteTitle && !topic.meetingNoteId?.startsWith('graphviz_') && (
                   <div style={{ color: '#6B7280', fontSize: '12px', marginBottom: '4px' }}>
                     議事録: {topic.meetingNoteTitle}
                   </div>
@@ -562,6 +654,11 @@ export default function EntityRelationList({
                   {relatedRelationsCount > 0 && (
                     <span>
                       🔗 リレーション: {relatedRelationsCount}件
+                    </span>
+                  )}
+                  {fileCount > 0 && (
+                    <span>
+                      📎 ファイル: {fileCount}件
                     </span>
                   )}
                   {topic.importance && (

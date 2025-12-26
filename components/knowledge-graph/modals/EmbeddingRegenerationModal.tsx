@@ -272,15 +272,25 @@ export default function EmbeddingRegenerationModal({
                     let targetEntities = selectedId === 'all'
                       ? entities.filter(e => e.organizationId)
                       : entities.filter(e => e.organizationId === selectedId);
+                    // Graphvizのリレーション（yamlFileIdが設定されている）の場合はtopicIdがnullでもOK
                     let targetRelations = selectedId === 'all'
                       ? relations.filter(r => {
                           const orgId = r.organizationId || entities.find(e => e.id === r.sourceEntityId || e.id === r.targetEntityId)?.organizationId;
-                          return orgId && r.topicId;
+                          // topicIdまたはyamlFileIdがあるもののみ（Graphvizのリレーションも含む）
+                          return orgId && (r.topicId || r.yamlFileId);
                         })
                       : relations.filter(r => {
                           const orgId = r.organizationId || entities.find(e => e.id === r.sourceEntityId || e.id === r.targetEntityId)?.organizationId;
-                          return orgId === selectedId && r.topicId;
+                          // topicIdまたはyamlFileIdがあるもののみ（Graphvizのリレーションも含む）
+                          return orgId === selectedId && (r.topicId || r.yamlFileId);
                         });
+                    
+                    devLog(`📊 [埋め込み再生成] targetRelationsフィルタリング後: ${targetRelations.length}件 (全リレーション: ${relations.length}件)`);
+                    if (targetRelations.length > 0) {
+                      const graphvizCount = targetRelations.filter(r => r.yamlFileId).length;
+                      const normalCount = targetRelations.filter(r => r.topicId && !r.yamlFileId).length;
+                      devLog(`📊 [埋め込み再生成] リレーション内訳: Graphviz=${graphvizCount}件, 通常=${normalCount}件`);
+                    }
                     // topicsプロップが空の場合、query_getで直接取得
                     let targetTopics: TopicInfo[] = [];
                     if (topics.length === 0) {
@@ -327,6 +337,13 @@ export default function EmbeddingRegenerationModal({
                       targetTopics = selectedId === 'all'
                         ? topics.filter(t => t.organizationId)
                         : topics.filter(t => t.organizationId === selectedId);
+                    }
+                    
+                    devLog(`📊 [埋め込み再生成] targetTopicsフィルタリング後: ${targetTopics.length}件 (全トピック: ${topics.length}件)`);
+                    if (targetTopics.length > 0) {
+                      const graphvizCount = targetTopics.filter(t => t.meetingNoteId?.startsWith('graphviz_')).length;
+                      const normalCount = targetTopics.filter(t => !t.meetingNoteId?.startsWith('graphviz_')).length;
+                      devLog(`📊 [埋め込み再生成] トピック内訳: Graphviz=${graphvizCount}件, 通常=${normalCount}件`);
                     }
 
                     // 未生成のみの場合は、SQLiteのchromaSyncedフラグでフィルタリング
@@ -651,10 +668,16 @@ export default function EmbeddingRegenerationModal({
                         // organizationIdを使用（typeで組織と事業会社を区別）
                         const orgOrCompanyId = organizationId || '';
 
-                        // topicIdがない場合はスキップ
-                        if (!relation.topicId) {
-                          devWarn(`⚠️ リレーション ${relation.id} (${relation.relationType}) にtopicIdがありません。スキップします。`);
+                        // Graphvizのリレーション（yamlFileIdが設定されている）の場合はtopicIdがnullでもOK
+                        // topicIdもyamlFileIdもない場合はスキップ
+                        if (!relation.topicId && !relation.yamlFileId) {
+                          devWarn(`⚠️ リレーション ${relation.id} (${relation.relationType}) にtopicIdもyamlFileIdもありません。スキップします。`);
                           continue;
+                        }
+                        
+                        // Graphvizのリレーションの場合、ログに出力
+                        if (relation.yamlFileId) {
+                          devLog(`📊 Graphvizリレーションの埋め込み生成: ${relation.id} (yamlFileId: ${relation.yamlFileId}, topicId: ${relation.topicId || 'null'})`);
                         }
 
                         // 未生成のみの場合は、既にフィルタリング済みなのでチェック不要

@@ -77,12 +77,18 @@ export async function getKnowledgeGraphContextWithResults(
       return { context: '', results: [], sources: [] };
     }
     
-    // 出典情報を収集
+    // 出典情報を収集（ファイル情報も含む）
     const sources: Array<{
       type: 'entity' | 'relation' | 'topic';
       id: string;
       name: string;
       score: number;
+      files?: Array<{
+        id: string;
+        filePath: string;
+        fileName: string;
+        mimeType?: string;
+      }>;
     }> = [];
 
     // コンテキストを構築
@@ -228,12 +234,35 @@ export async function getKnowledgeGraphContextWithResults(
           : '';
         contextParts.push(`- **${topic.title}**${scoreText}`);
         
-        // 出典情報を追加
+        // ファイル情報のデバッグログ
+        console.log(`[getKnowledgeGraphContextWithResults] トピック ${topic.topicId} のファイル情報:`, {
+          topicId: topic.topicId,
+          title: topic.title,
+          hasFiles: !!topic.files,
+          filesCount: topic.files?.length || 0,
+          fileNames: topic.files?.map(f => f.fileName) || [],
+        });
+        
+        // 出典情報を追加（ファイル情報も含む）
+        const sourceFiles = topic.files?.map(f => ({
+          id: f.id,
+          filePath: f.filePath,
+          fileName: f.fileName,
+          mimeType: f.mimeType,
+        }));
+        
+        console.log(`[getKnowledgeGraphContextWithResults] sourceに追加するファイル情報:`, {
+          topicId: topic.topicId,
+          sourceFilesCount: sourceFiles?.length || 0,
+          sourceFileNames: sourceFiles?.map(f => f.fileName) || [],
+        });
+        
         sources.push({
           type: 'topic',
           id: topic.topicId,
           name: topic.title,
           score: typeof result.score === 'number' && !isNaN(result.score) ? result.score : 0,
+          files: sourceFiles,
         });
         
         // トピックの内容を詳細に表示（人物名などの検索に重要）
@@ -249,6 +278,11 @@ export async function getKnowledgeGraphContextWithResults(
         }
         if (topic.keywords && topic.keywords.length > 0) {
           contextParts.push(`  キーワード: ${topic.keywords.join(', ')}`);
+        }
+        
+        // ファイル情報を表示
+        if (topic.files && topic.files.length > 0) {
+          contextParts.push(`  関連ファイル: ${topic.files.map(f => f.fileName).join(', ')}`);
         }
       }
     } else {

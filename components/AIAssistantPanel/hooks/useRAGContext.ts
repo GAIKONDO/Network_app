@@ -4,9 +4,10 @@ export function useRAGContext() {
   const getRAGContext = async (
     queryText: string,
     organizationId?: string
-  ): Promise<{ context: string; sources: RAGSource[] }> => {
+  ): Promise<{ context: string; sources: RAGSource[]; results?: any[] }> => {
     let ragContext = '';
     let ragSources: RAGSource[] = [];
+    let ragResults: any[] = [];
 
     try {
       const { getOrchestratedRAGContext } = await import('@/lib/orchestration/ragOrchestrator');
@@ -47,6 +48,7 @@ export function useRAGContext() {
         }
         
         ragSources = kgContextResult.sources;
+        ragResults = kgContextResult.results;
       } catch (sourceError) {
         console.warn('[useRAGContext] ナレッジグラフ検索エラー:', sourceError);
       }
@@ -85,6 +87,7 @@ export function useRAGContext() {
         if (kgContextResult.context && kgContextResult.context.trim() !== '') {
           ragContext = `\n\n${kgContextResult.context}\n\n`;
           ragSources = kgContextResult.sources;
+          ragResults = kgContextResult.results;
         }
       }
     } catch (ragError) {
@@ -108,7 +111,7 @@ export function useRAGContext() {
       }
     }
 
-    return { context: ragContext, sources: ragSources };
+    return { context: ragContext, sources: ragSources, results: ragResults };
   };
 
   return { getRAGContext };

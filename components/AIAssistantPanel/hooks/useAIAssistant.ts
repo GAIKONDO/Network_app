@@ -725,7 +725,7 @@ export function useAIAssistant(
       }
       
       // RAGコンテキストを取得
-      const { context: ragContext, sources: ragSources } = await getRAGContext(
+      const { context: ragContext, sources: ragSources, results: ragResults } = await getRAGContext(
         inputText,
         organizationId
       );
@@ -742,7 +742,8 @@ export function useAIAssistant(
         organizationId,
         selectedAgent,
         meetingNoteId,
-        itemId
+        itemId,
+        ragResults // RAG検索結果（ファイル情報を含む）
       );
 
       // ローディングメッセージを実際のレスポンスに置き換え

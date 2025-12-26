@@ -4,7 +4,7 @@
 
 import type { KnowledgeGraphSearchResult, SearchFilters, TopicSummary } from './types';
 import { findSimilarTopicsChroma } from '../topicEmbeddingsChroma';
-import { getTopicsByIds } from '../topicApi';
+import { getTopicsByIds, getTopicFilesByTopicIds } from '../topicApi';
 import { normalizeSimilarity, calculateTopicScore, adjustWeightsForQuery, DEFAULT_WEIGHTS, type ScoringWeights } from '../ragSearchScoring';
 
 /**
@@ -54,6 +54,49 @@ export async function searchTopics(
 
     // トピックIDとmeetingNoteIdの複合キーでマップを作成
     const topicMap = new Map(topics.map(t => [`${t.topicId}-${t.meetingNoteId}`, t]));
+
+    // トピックファイル情報を一括取得
+    // topicFilesテーブルのtopicIdは{meetingNoteId}-topic-{topicId}形式
+    const topicIdsForFiles = topicIdsWithMeetingNoteIds.map(({ topicId, meetingNoteId }) => 
+      `${meetingNoteId}-topic-${topicId}`
+    );
+    const topicFiles = await getTopicFilesByTopicIds(topicIdsForFiles);
+    
+    // トピックIDをキーにしたファイルマップを作成
+    const filesMap = new Map<string, Array<{
+      id: string;
+      filePath: string;
+      fileName: string;
+      mimeType?: string;
+      description?: string;
+      detailedDescription?: string;
+      fileSize?: number;
+    }>>();
+    for (const file of topicFiles) {
+      if (!filesMap.has(file.topicId)) {
+        filesMap.set(file.topicId, []);
+      }
+      filesMap.get(file.topicId)!.push({
+        id: file.id,
+        filePath: file.filePath,
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        description: file.description,
+        detailedDescription: file.detailedDescription,
+        fileSize: file.fileSize,
+      });
+    }
+    
+    console.log(`[searchTopics] 取得したファイル数: ${topicFiles.length}件 (トピック数: ${topicIdsForFiles.length})`);
+    console.log(`[searchTopics] filesMapの内容:`, {
+      filesMapSize: filesMap.size,
+      filesMapKeys: Array.from(filesMap.keys()),
+      filesMapEntries: Array.from(filesMap.entries()).map(([key, files]) => ({
+        key,
+        fileCount: files.length,
+        fileNames: files.map(f => f.fileName),
+      })),
+    });
 
     // 結果を構築
     const results: KnowledgeGraphSearchResult[] = [];
@@ -161,6 +204,17 @@ export async function searchTopics(
         isFinite: isFinite(score),
       });
 
+      // このトピックに紐づくファイル情報を取得
+      const topicIdForFiles = `${meetingNoteId}-topic-${topicId}`;
+      const files = filesMap.get(topicIdForFiles) || [];
+      
+      console.log(`[searchTopics] トピック ${topicId} (meetingNoteId: ${meetingNoteId}) のファイル情報:`, {
+        topicIdForFiles,
+        filesCount: files.length,
+        filesMapHasKey: filesMap.has(topicIdForFiles),
+        files: files.map(f => ({ fileName: f.fileName, filePath: f.filePath })),
+      });
+
       results.push({
         type: 'topic',
         id: topicId, // トピックのIDとしてtopicIdを使用
@@ -176,6 +230,15 @@ export async function searchTopics(
           keywords: topic.keywords,
           meetingNoteId: topic.meetingNoteId,
           organizationId: topic.organizationId,
+          files: files.length > 0 ? files.map(f => ({
+            id: f.id,
+            filePath: f.filePath,
+            fileName: f.fileName,
+            mimeType: f.mimeType,
+            description: f.description,
+            detailedDescription: f.detailedDescription,
+            fileSize: f.fileSize,
+          })) : undefined,
         },
       });
     }

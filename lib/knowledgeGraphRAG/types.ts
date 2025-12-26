@@ -11,6 +11,19 @@ import type { Relation } from '@/types/relation';
 export type SearchResultType = 'entity' | 'relation' | 'topic';
 
 /**
+ * トピックファイル情報
+ */
+export interface TopicFileInfo {
+  id: string;
+  filePath: string;
+  fileName: string;
+  mimeType?: string;
+  description?: string;
+  detailedDescription?: string;
+  fileSize?: number;
+}
+
+/**
  * トピックサマリー（RAG検索結果用）
  */
 export interface TopicSummary {
@@ -21,6 +34,7 @@ export interface TopicSummary {
   keywords?: string[];
   meetingNoteId?: string;
   organizationId?: string;
+  files?: TopicFileInfo[]; // トピックに紐づくファイル情報
 }
 
 /**

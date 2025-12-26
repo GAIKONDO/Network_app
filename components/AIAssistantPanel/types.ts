@@ -25,5 +25,11 @@ export interface RAGSource {
   id: string;
   name: string;
   score: number;
+  files?: Array<{
+    id: string;
+    filePath: string;
+    fileName: string;
+    mimeType?: string;
+  }>;
 }
 

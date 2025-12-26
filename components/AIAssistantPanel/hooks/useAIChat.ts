@@ -76,7 +76,8 @@ export function useAIChat(modelType: ModelType, selectedModel: string) {
     organizationId?: string,
     selectedAgent?: any,
     meetingNoteId?: string | null,
-    itemId?: string | null
+    itemId?: string | null,
+    ragResults?: any[] // RAG検索結果（ファイル情報を含む）
   ): Promise<string> => {
     const aiStartTime = Date.now();
 
@@ -429,10 +430,10 @@ ${selectedAgent.systemPrompt ? `\n**Agentシステムプロンプト:**\n${selec
       }
     }
 
-    // 出典情報を追加
+    // 出典情報を追加（ファイル情報も含む）
     if (ragSources.length > 0) {
       const { formatSources } = await import('@/lib/knowledgeGraphRAG');
-      const sourcesText = formatSources(ragSources);
+      const sourcesText = formatSources(ragSources, ragResults);
       if (sourcesText && !responseText.includes('参考情報の出典')) {
         responseText += sourcesText;
       }

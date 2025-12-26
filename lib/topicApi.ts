@@ -7,6 +7,20 @@ import { callTauriCommand } from './localFirebase';
 import type { TopicInfo } from './orgApi';
 
 /**
+ * トピックファイル情報
+ */
+export interface TopicFileInfo {
+  id: string;
+  topicId: string;
+  filePath: string;
+  fileName: string;
+  mimeType?: string;
+  description?: string;
+  detailedDescription?: string;
+  fileSize?: number;
+}
+
+/**
  * トピック情報（RAG検索用）
  */
 export interface TopicSearchInfo {
@@ -22,6 +36,7 @@ export interface TopicSearchInfo {
   createdAt?: string;
   updatedAt?: string;
   searchCount?: number;
+  files?: TopicFileInfo[]; // トピックに紐づくファイル情報
 }
 
 /**
@@ -32,7 +47,43 @@ export async function getTopicById(
   meetingNoteId: string
 ): Promise<TopicSearchInfo | null> {
   try {
-    // まず、議事録からトピック情報を取得
+    // Graphvizのトピックの場合は、topicsテーブルから直接取得
+    if (meetingNoteId && meetingNoteId.startsWith('graphviz_')) {
+      console.log(`[getTopicById] Graphvizトピックのため、topicsテーブルから直接取得: topicId=${topicId}, meetingNoteId=${meetingNoteId}`);
+      const { callTauriCommand } = await import('./localFirebase');
+      const embeddingId = `${meetingNoteId}-topic-${topicId}`;
+      
+      try {
+        const topicDoc = await callTauriCommand('doc_get', {
+          collectionName: 'topics',
+          docId: embeddingId,
+        }) as any;
+        
+        if (topicDoc?.exists && topicDoc?.data) {
+          const topicData = topicDoc.data;
+          return {
+            topicId: topicData.topicId || topicId,
+            meetingNoteId: topicData.meetingNoteId || meetingNoteId,
+            title: topicData.title || '',
+            content: topicData.content || '',
+            summary: topicData.description || topicData.contentSummary,
+            semanticCategory: topicData.semanticCategory,
+            importance: topicData.importance,
+            organizationId: topicData.organizationId || '',
+            keywords: topicData.keywords ? (Array.isArray(topicData.keywords) ? topicData.keywords : JSON.parse(topicData.keywords)) : [],
+            createdAt: topicData.createdAt,
+            updatedAt: topicData.updatedAt,
+            searchCount: topicData.searchCount || 0,
+          };
+        }
+      } catch (error) {
+        console.warn(`[getTopicById] Graphvizトピックの取得エラー:`, error);
+      }
+      
+      return null;
+    }
+    
+    // 通常の議事録からトピック情報を取得
     const { getTopicsByMeetingNote } = await import('./orgApi');
     const topics = await getTopicsByMeetingNote(meetingNoteId);
     
@@ -107,6 +158,143 @@ export async function getTopicsByIds(
     return topics;
   } catch (error) {
     console.error('[getTopicsByIds] エラー:', error);
+    return [];
+  }
+}
+
+/**
+ * 複数のトピックIDでトピックファイル情報を一括取得
+ * @param topicIds トピックIDの配列（{meetingNoteId}-topic-{topicId}形式）
+ * @returns トピックファイル情報の配列
+ */
+export async function getTopicFilesByTopicIds(
+  topicIds: string[]
+): Promise<TopicFileInfo[]> {
+  if (topicIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const { callTauriCommand } = await import('./localFirebase');
+    const allFiles: TopicFileInfo[] = [];
+
+    // バッチで取得（topicIdsを分割してクエリ）
+    const batchSize = 10;
+    for (let i = 0; i < topicIds.length; i += batchSize) {
+      const batch = topicIds.slice(i, i + batchSize);
+      
+      // デバッグ: topicFilesテーブルの全件を取得して確認（最初の1回のみ）
+      if (i === 0) {
+        try {
+          const allFilesDebug = await callTauriCommand('query_get', {
+            collectionName: 'topicFiles',
+            conditions: {},
+          }) as Array<{ id: string; data: any }>;
+          console.log(`[getTopicFilesByTopicIds] 🔍 デバッグ: topicFilesテーブルの全件数=${allFilesDebug?.length || 0}`, {
+            allFiles: allFilesDebug?.slice(0, 10).map((item: any) => ({
+              id: item.id,
+              topicId: item.data?.topicId || item.topicId,
+              fileName: item.data?.fileName || item.fileName,
+              meetingNoteId: item.data?.meetingNoteId || item.meetingNoteId,
+            })),
+            totalCount: allFilesDebug?.length || 0,
+          });
+        } catch (debugError) {
+          console.warn('[getTopicFilesByTopicIds] デバッグ用の全件取得エラー:', debugError);
+        }
+      }
+      
+      // 各トピックIDでファイルを取得
+      const filePromises = batch.map(async (topicId) => {
+        try {
+          console.log(`[getTopicFilesByTopicIds] ファイル取得開始: topicId=${topicId}`);
+          
+          // 1. topicFilesテーブルから取得
+          const filesResult = await callTauriCommand('query_get', {
+            collectionName: 'topicFiles',
+            conditions: { topicId },
+          }) as Array<{ id: string; data: any }>;
+
+          console.log(`[getTopicFilesByTopicIds] topicFilesテーブルから取得: topicId=${topicId}, count=${filesResult?.length || 0}`);
+
+          const files: TopicFileInfo[] = [];
+          
+          // topicFilesテーブルから取得したファイルを追加
+          if (filesResult && Array.isArray(filesResult) && filesResult.length > 0) {
+            files.push(...filesResult.map((item: any) => {
+              const file = item.data || item;
+              return {
+                id: item.id || file.id,
+                topicId: topicId,
+                filePath: file.filePath || '',
+                fileName: file.fileName || '',
+                mimeType: file.mimeType,
+                description: file.description,
+                detailedDescription: file.detailedDescription,
+                fileSize: file.fileSize,
+              } as TopicFileInfo;
+            }));
+          }
+          
+          // 2. Graphvizカードのトピックの場合、graphvizYamlFileAttachmentsテーブルからも取得
+          // topicIdの形式: graphviz_{yamlFileId}-topic-{yamlFileId}
+          if (topicId.startsWith('graphviz_') && topicId.includes('-topic-')) {
+            const yamlFileIdMatch = topicId.match(/graphviz_(.+?)-topic-\1$/);
+            if (yamlFileIdMatch && yamlFileIdMatch[1]) {
+              const yamlFileId = yamlFileIdMatch[1];
+              console.log(`[getTopicFilesByTopicIds] Graphvizカードのファイルを取得: yamlFileId=${yamlFileId}`);
+              
+              try {
+                const graphvizFilesResult = await callTauriCommand('query_get', {
+                  collectionName: 'graphvizYamlFileAttachments',
+                  conditions: { yamlFileId },
+                }) as Array<{ id: string; data: any }>;
+                
+                console.log(`[getTopicFilesByTopicIds] graphvizYamlFileAttachmentsテーブルから取得: yamlFileId=${yamlFileId}, count=${graphvizFilesResult?.length || 0}`);
+                
+                if (graphvizFilesResult && Array.isArray(graphvizFilesResult) && graphvizFilesResult.length > 0) {
+                  files.push(...graphvizFilesResult.map((item: any) => {
+                    const file = item.data || item;
+                    return {
+                      id: item.id || file.id,
+                      topicId: topicId, // topicIdを設定（topicsテーブルのid）
+                      filePath: file.filePath || '',
+                      fileName: file.fileName || '',
+                      mimeType: file.mimeType,
+                      description: file.description,
+                      detailedDescription: file.detailedDescription,
+                      fileSize: file.fileSize,
+                    } as TopicFileInfo;
+                  }));
+                }
+              } catch (graphvizError) {
+                console.warn(`[getTopicFilesByTopicIds] Graphvizカードのファイル取得エラー:`, graphvizError);
+              }
+            }
+          }
+
+          console.log(`[getTopicFilesByTopicIds] ファイル取得結果: topicId=${topicId}, totalCount=${files.length}`, {
+            files: files.map(f => ({
+              id: f.id,
+              fileName: f.fileName,
+            })),
+          });
+
+          return files;
+        } catch (error) {
+          console.warn(`[getTopicFilesByTopicIds] トピックID ${topicId} のファイル取得エラー:`, error);
+          return [];
+        }
+      });
+
+      const batchResults = await Promise.all(filePromises);
+      allFiles.push(...batchResults.flat());
+    }
+
+    console.log(`[getTopicFilesByTopicIds] 取得したファイル数: ${allFiles.length}件 (トピック数: ${topicIds.length})`);
+    return allFiles;
+  } catch (error) {
+    console.error('[getTopicFilesByTopicIds] エラー:', error);
     return [];
   }
 }
