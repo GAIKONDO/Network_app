@@ -11,6 +11,7 @@ import FocusAreasTab from './components/tabs/FocusAreasTab';
 import FocusInitiativesTab from './components/tabs/FocusInitiativesTab';
 import MeetingNotesTab from './components/tabs/MeetingNotesTab';
 import RegulationsTab from './components/tabs/RegulationsTab';
+import StartupsTab from './components/tabs/StartupsTab';
 import GraphvizTab from './components/tabs/GraphvizTab';
 import AddInitiativeModal from './components/modals/AddInitiativeModal';
 import DeleteInitiativeModal from './components/modals/DeleteInitiativeModal';
@@ -18,11 +19,14 @@ import AddMeetingNoteModal from './components/modals/AddMeetingNoteModal';
 import DeleteMeetingNoteModal from './components/modals/DeleteMeetingNoteModal';
 import AddRegulationModal from './components/modals/AddRegulationModal';
 import DeleteRegulationModal from './components/modals/DeleteRegulationModal';
+import AddStartupModal from './components/modals/AddStartupModal';
+import DeleteStartupModal from './components/modals/DeleteStartupModal';
 import { OrganizationTabBar, type OrganizationTab } from './components/OrganizationTabBar';
 import { useOrganizationData } from './hooks/useOrganizationData';
 import { useInitiativeHandlers } from './hooks/useInitiativeHandlers';
 import { useMeetingNoteHandlers } from './hooks/useMeetingNoteHandlers';
 import { useRegulationHandlers } from './hooks/useRegulationHandlers';
+import { useStartupHandlers } from './hooks/useStartupHandlers';
 import { getAllGraphvizYamlFiles } from '@/lib/graphvizApi';
 
 // 開発環境でのみログを有効化するヘルパー関数（パフォーマンス最適化）
@@ -56,6 +60,8 @@ function OrganizationDetailPageContent() {
     setMeetingNotes,
     regulations,
     setRegulations,
+    startups,
+    setStartups,
     loading,
     error,
     reloadInitiatives,
@@ -68,6 +74,7 @@ function OrganizationDetailPageContent() {
   // 各タブのコンテンツ用のref
   const introductionTabRef = useRef<HTMLDivElement>(null);
   const focusAreasTabRef = useRef<HTMLDivElement>(null);
+  const startupsTabRef = useRef<HTMLDivElement>(null);
   const focusInitiativesTabRef = useRef<HTMLDivElement>(null);
   const meetingNotesTabRef = useRef<HTMLDivElement>(null);
   const regulationsTabRef = useRef<HTMLDivElement>(null);
@@ -96,11 +103,19 @@ function OrganizationDetailPageContent() {
     regulations,
     setRegulations,
   });
+  
+  // スタートアップ関連のハンドラー
+  const startupHandlers = useStartupHandlers({
+    organizationId,
+    organization,
+    startups,
+    setStartups,
+  });
 
 
   // タブパラメータが変更されたときにactiveTabを更新
   useEffect(() => {
-    if (tabParam && ['introduction', 'focusAreas', 'focusInitiatives', 'meetingNotes', 'regulations', 'graphviz'].includes(tabParam)) {
+    if (tabParam && ['introduction', 'focusAreas', 'startups', 'focusInitiatives', 'meetingNotes', 'regulations', 'graphviz'].includes(tabParam)) {
       setActiveTab(tabParam);
     } else if (!tabParam) {
       setActiveTab('introduction');
@@ -138,6 +153,10 @@ function OrganizationDetailPageContent() {
         tabRef = focusAreasTabRef;
         tabName = '注力領域';
         break;
+      case 'startups':
+        tabRef = startupsTabRef;
+        tabName = 'スタートアップ';
+        break;
       case 'focusInitiatives':
         tabRef = focusInitiativesTabRef;
         tabName = '注力施策';
@@ -149,6 +168,10 @@ function OrganizationDetailPageContent() {
       case 'regulations':
         tabRef = regulationsTabRef;
         tabName = '制度';
+        break;
+      case 'startups':
+        tabRef = startupsTabRef;
+        tabName = 'スタートアップ';
         break;
       case 'graphviz':
         tabRef = graphvizTabRef;
@@ -282,6 +305,7 @@ function OrganizationDetailPageContent() {
           focusInitiativesCount={focusInitiatives.length}
           meetingNotesCount={meetingNotes.length}
           regulationsCount={regulations.length}
+          startupsCount={startups.length}
           graphvizCount={graphvizCount}
         />
 
@@ -299,6 +323,24 @@ function OrganizationDetailPageContent() {
             organizationContent={organizationContent}
             tabRef={focusAreasTabRef}
             onDownloadImage={handleDownloadTabImage}
+          />
+        )}
+
+        {activeTab === 'startups' && (
+          <StartupsTab
+            organizationId={organizationId}
+            startups={startups}
+            editingStartupId={startupHandlers.editingStartupId}
+            editingStartupTitle={startupHandlers.editingStartupTitle}
+            setEditingStartupTitle={startupHandlers.setEditingStartupTitle}
+            savingStartup={startupHandlers.savingStartup}
+            tabRef={startupsTabRef}
+            onDownloadImage={handleDownloadTabImage}
+            onOpenAddModal={startupHandlers.handleOpenAddStartupModal}
+            onStartEdit={startupHandlers.handleStartEditStartup}
+            onCancelEdit={startupHandlers.handleCancelEditStartup}
+            onSaveEdit={startupHandlers.handleSaveEditStartup}
+            onDelete={startupHandlers.handleDeleteStartup}
           />
         )}
 
@@ -447,6 +489,33 @@ function OrganizationDetailPageContent() {
           savingRegulation={regulationHandlers.savingRegulation}
           onClose={regulationHandlers.cancelDeleteRegulation}
           onConfirm={regulationHandlers.confirmDeleteRegulation}
+        />
+
+        {/* スタートアップ追加モーダル */}
+        <AddStartupModal
+          isOpen={startupHandlers.showAddStartupModal}
+          newStartupId={startupHandlers.newStartupId}
+          newStartupTitle={startupHandlers.newStartupTitle}
+          newStartupDescription={startupHandlers.newStartupDescription}
+          savingStartup={startupHandlers.savingStartup}
+          onClose={() => {
+            startupHandlers.setShowAddStartupModal(false);
+            startupHandlers.setNewStartupTitle('');
+            startupHandlers.setNewStartupDescription('');
+            startupHandlers.setNewStartupId('');
+          }}
+          onSave={startupHandlers.handleAddStartup}
+          onTitleChange={startupHandlers.setNewStartupTitle}
+          onDescriptionChange={startupHandlers.setNewStartupDescription}
+        />
+
+        {/* スタートアップ削除確認モーダル */}
+        <DeleteStartupModal
+          isOpen={startupHandlers.showDeleteStartupConfirmModal && !!startupHandlers.deleteTargetStartupId}
+          startupTitle={startups.find(s => s.id === startupHandlers.deleteTargetStartupId)?.title || 'このスタートアップ'}
+          savingStartup={startupHandlers.savingStartup}
+          onClose={startupHandlers.cancelDeleteStartup}
+          onConfirm={startupHandlers.confirmDeleteStartup}
         />
       </div>
     </Layout>

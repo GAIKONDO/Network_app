@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getOrgTreeFromDb, findOrganizationById, getOrgMembers, getFocusInitiatives, getMeetingNotes, getRegulations, getOrganizationContent } from '@/lib/orgApi';
+import { getOrgTreeFromDb, findOrganizationById, getOrgMembers, getFocusInitiatives, getMeetingNotes, getRegulations, getStartups, getOrganizationContent } from '@/lib/orgApi';
 import type { OrgNodeData } from '@/components/OrgChart';
-import type { FocusInitiative, MeetingNote, Regulation, OrganizationContent } from '@/lib/orgApi';
+import type { FocusInitiative, MeetingNote, Regulation, Startup, OrganizationContent } from '@/lib/orgApi';
 import { sortMembersByPosition } from '@/lib/memberSort';
 
 // 開発環境でのみログを有効化するヘルパー関数（パフォーマンス最適化）
@@ -26,6 +26,8 @@ export interface UseOrganizationDataReturn {
   setMeetingNotes: React.Dispatch<React.SetStateAction<MeetingNote[]>>;
   regulations: Regulation[];
   setRegulations: React.Dispatch<React.SetStateAction<Regulation[]>>;
+  startups: Startup[];
+  setStartups: React.Dispatch<React.SetStateAction<Startup[]>>;
   loading: boolean;
   error: string | null;
   reloadInitiatives: (orgId: string, orgTree: OrgNodeData | null) => Promise<void>;
@@ -38,6 +40,7 @@ export function useOrganizationData(organizationId: string | null): UseOrganizat
   const [initiativesByOrg, setInitiativesByOrg] = useState<Map<string, { orgName: string; initiatives: FocusInitiative[] }>>(new Map());
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>([]);
   const [regulations, setRegulations] = useState<Regulation[]>([]);
+  const [startups, setStartups] = useState<Startup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -433,6 +436,14 @@ export function useOrganizationData(organizationId: string | null): UseOrganizat
             } catch (regulationError: any) {
               devWarn('制度の取得に失敗しました:', regulationError);
             }
+            
+            // スタートアップを取得
+            try {
+              const startupsData = await getStartups(validOrganizationId);
+              setStartups(startupsData);
+            } catch (startupError: any) {
+              devWarn('スタートアップの取得に失敗しました:', startupError);
+            }
           } catch (memberError: any) {
             devWarn('メンバー情報の取得に失敗しました:', memberError);
             // 正しいIDを確実に設定
@@ -510,7 +521,10 @@ export function useOrganizationData(organizationId: string | null): UseOrganizat
     meetingNotes,
     setMeetingNotes,
     regulations,
+    regulations,
     setRegulations,
+    startups,
+    setStartups,
     loading,
     error,
     reloadInitiatives,

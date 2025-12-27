@@ -934,6 +934,83 @@ export interface Regulation {
 }
 
 /**
+ * スタートアップのIDを生成
+ */
+function generateStartupId(): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 11);
+  return `startup_${timestamp}_${randomPart}`;
+}
+
+/**
+ * スタートアップのユニークIDを生成（エクスポート）
+ */
+export function generateUniqueStartupId(): string {
+  return generateStartupId();
+}
+
+/**
+ * スタートアップの型定義
+ */
+// 評価チャート関連の型定義
+export interface EvaluationAxis {
+  id: string;
+  label: string;
+  priority: '高' | '中' | '低';
+  weight: number;
+  score: number; // 0-5
+  maxValue: number; // 通常は5
+  basis?: string; // 比較の根拠
+}
+
+export interface EvaluationChartData {
+  axes: EvaluationAxis[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EvaluationChartSnapshot {
+  id: string;
+  name: string;
+  date: string;
+  data: EvaluationChartData;
+}
+
+export interface Startup {
+  id: string;
+  organizationId?: string;
+  companyId?: string;
+  title: string;
+  description?: string;
+  content?: string; // 詳細コンテンツ（マークダウン）
+  assignee?: string; // 担当者
+  method?: string[]; // 手法（複数選択可能）
+  methodOther?: string; // 手法（その他）
+  methodDetails?: Record<string, any>; // 手法の詳細情報（各手法ごとのテーブルデータ）
+  means?: string[]; // 手段（複数選択可能）
+  meansOther?: string; // 手段（その他）
+  objective?: string; // 目標
+  evaluation?: string; // 評価
+  evaluationChart?: EvaluationChartData; // 評価チャートデータ
+  evaluationChartSnapshots?: EvaluationChartSnapshot[]; // 評価チャートのスナップショット
+  considerationPeriod?: string; // 検討期間
+  executionPeriod?: string; // 実行期間
+  monetizationPeriod?: string; // 収益化期間
+  relatedOrganizations?: string[]; // 関連組織
+  relatedGroupCompanies?: string[]; // 関連グループ会社
+  monetizationDiagram?: string; // マネタイズ図（Mermaid図）
+  monetizationDiagramId?: string; // マネタイズ図のユニークID
+  relationDiagram?: string; // 相関図（Mermaid図）
+  relationDiagramId?: string; // 相関図のユニークID
+  causeEffectDiagramId?: string; // 特性要因図のユニークID
+  themeId?: string; // 関連するテーマID（後方互換性のため残す）
+  themeIds?: string[]; // 関連するテーマIDの配列（複数のテーマにリンク可能）
+  topicIds?: string[]; // 関連する個別トピックIDの配列（複数のトピックにリンク可能）
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/**
  * 注力施策を取得
  */
 export async function getFocusInitiatives(organizationId: string): Promise<FocusInitiative[]> {
@@ -2602,6 +2679,488 @@ export async function deleteRegulation(regulationId: string): Promise<void> {
     }
   } catch (error: any) {
     console.error('❌ [deleteRegulation] エラー:', error);
+    throw error;
+  }
+}
+
+/**
+ * スタートアップを取得
+ */
+export async function getStartups(organizationId: string): Promise<Startup[]> {
+  try {
+    console.log('📖 [getStartups] 開始:', { organizationId });
+    
+    const { callTauriCommand } = await import('./localFirebase');
+    
+    try {
+      console.log('📖 [getStartups] collection_get呼び出し前:', { collectionName: 'startups' });
+      const result = await callTauriCommand('collection_get', {
+        collectionName: 'startups',
+      });
+      
+      console.log('📖 [getStartups] collection_get結果:', {
+        resultType: typeof result,
+        isArray: Array.isArray(result),
+        resultLength: Array.isArray(result) ? result.length : 'N/A',
+      });
+      
+      const allStartups = Array.isArray(result) ? result : [];
+      console.log('📖 [getStartups] 全データ数:', allStartups.length);
+      
+      const filtered = allStartups
+        .filter((item: any) => {
+          const data = item.data || item;
+          const matches = data.organizationId === organizationId;
+          if (!matches && allStartups.length > 0) {
+            console.log('📖 [getStartups] フィルタ除外:', {
+              itemId: data.id || item.id,
+              itemOrganizationId: data.organizationId,
+              targetOrganizationId: organizationId,
+              match: matches,
+            });
+          }
+          return matches;
+        })
+        .map((item: any) => {
+          const data = item.data || item;
+          return {
+            id: data.id || item.id,
+            organizationId: data.organizationId,
+            title: data.title || '',
+            description: data.description || '',
+            content: data.content || '',
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt,
+          } as Startup;
+        });
+      
+      console.log('📖 [getStartups] フィルタ後:', {
+        filteredCount: filtered.length,
+        filteredIds: filtered.map(s => s.id),
+      });
+      
+      // createdAtでソート（新しい順）
+      const sorted = filtered.sort((a, b) => {
+        const aTime = a.createdAt ? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : (a.createdAt.toMillis ? a.createdAt.toMillis() : 0)) : 0;
+        const bTime = b.createdAt ? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : (b.createdAt.toMillis ? b.createdAt.toMillis() : 0)) : 0;
+        return bTime - aTime;
+      });
+      
+      console.log('📖 [getStartups] 最終結果:', {
+        count: sorted.length,
+        startups: sorted.map(s => ({ id: s.id, title: s.title, organizationId: s.organizationId })),
+      });
+      return sorted;
+    } catch (collectionError: any) {
+      console.error('📖 [getStartups] collection_getエラー:', {
+        error: collectionError,
+        errorMessage: collectionError?.message,
+        errorStack: collectionError?.stack,
+        collectionName: 'startups',
+      });
+      return [];
+    }
+  } catch (error: any) {
+    console.error('❌ [getStartups] エラー:', {
+      error,
+      errorMessage: error?.message,
+      errorStack: error?.stack,
+      organizationId,
+    });
+    return [];
+  }
+}
+
+/**
+ * スタートアップを保存
+ */
+export async function saveStartup(startup: Partial<Startup>): Promise<string> {
+  try {
+    const startupId = startup.id || generateStartupId();
+    console.log('💾 [saveStartup] 開始:', { startupId, organizationId: startup.organizationId, title: startup.title });
+    
+    // organizationIdがorganizationsテーブルに存在するか確認
+    if (startup.organizationId) {
+      try {
+        const orgDocRef = doc(null, 'organizations', startup.organizationId);
+        const orgDoc = await getDoc(orgDocRef);
+        if (!orgDoc.exists()) {
+          throw new Error(`組織ID "${startup.organizationId}" がorganizationsテーブルに存在しません`);
+        }
+        console.log('✅ [saveStartup] 組織IDの存在確認成功:', startup.organizationId);
+      } catch (orgCheckError: any) {
+        const errorMessage = orgCheckError?.message || String(orgCheckError || '');
+        if (errorMessage.includes('存在しません')) {
+          throw new Error(`組織ID "${startup.organizationId}" がorganizationsテーブルに存在しません。組織一覧ページから正しい組織を選択してください。`);
+        }
+        console.warn('⚠️ [saveStartup] 組織IDの存在確認でエラー（続行します）:', errorMessage);
+      }
+    } else {
+      throw new Error('organizationIdが指定されていません');
+    }
+    
+    const docRef = doc(null, 'startups', startupId);
+    
+    const now = new Date().toISOString();
+    
+    const data: any = {
+      id: startupId,
+      organizationId: startup.organizationId!,
+      title: startup.title || '',
+      description: startup.description || '',
+      content: startup.content || '',
+      assignee: startup.assignee || '',
+      method: startup.method || [],
+      methodOther: startup.methodOther || '',
+      methodDetails: startup.methodDetails || {},
+      means: startup.means || [],
+      meansOther: startup.meansOther || '',
+      objective: startup.objective || '',
+      evaluation: startup.evaluation || '',
+      evaluationChart: startup.evaluationChart || null,
+      evaluationChartSnapshots: startup.evaluationChartSnapshots || [],
+      considerationPeriod: startup.considerationPeriod || '',
+      executionPeriod: startup.executionPeriod || '',
+      monetizationPeriod: startup.monetizationPeriod || '',
+      relatedOrganizations: startup.relatedOrganizations || [],
+      relatedGroupCompanies: startup.relatedGroupCompanies || [],
+      monetizationDiagram: startup.monetizationDiagram || '',
+      monetizationDiagramId: startup.monetizationDiagramId || '',
+      relationDiagram: startup.relationDiagram || '',
+      relationDiagramId: startup.relationDiagramId || '',
+      causeEffectDiagramId: startup.causeEffectDiagramId || '',
+      themeId: startup.themeId || '',
+      themeIds: Array.isArray(startup.themeIds) ? startup.themeIds : (startup.themeIds ? [startup.themeIds] : []),
+      topicIds: Array.isArray(startup.topicIds) ? startup.topicIds : (startup.topicIds ? [startup.topicIds] : []),
+      updatedAt: now,
+    };
+    
+    // 既存ドキュメントの確認
+    let existingData: Startup | null = null;
+    try {
+      const existingDoc = await getDoc(docRef);
+      if (existingDoc.exists()) {
+        existingData = existingDoc.data() as Startup;
+        if (existingData?.createdAt) {
+          data.createdAt = typeof existingData.createdAt === 'string' 
+            ? existingData.createdAt 
+            : (existingData.createdAt.toMillis ? new Date(existingData.createdAt.toMillis()).toISOString() : now);
+        } else {
+          data.createdAt = now;
+        }
+        // evaluationChartとevaluationChartSnapshotsがnullまたはundefinedの場合、既存データを保持
+        // ただし、既存データがJSON文字列の場合はパースする
+        if (!data.evaluationChart && existingData?.evaluationChart) {
+          if (typeof existingData.evaluationChart === 'string') {
+            try {
+              data.evaluationChart = JSON.parse(existingData.evaluationChart);
+              console.log('💾 [saveStartup] 既存のevaluationChartを保持（JSON文字列からパース）');
+            } catch (e) {
+              console.warn('⚠️ [saveStartup] 既存のevaluationChartのパースに失敗:', e);
+              data.evaluationChart = existingData.evaluationChart as any;
+            }
+          } else {
+            data.evaluationChart = existingData.evaluationChart;
+            console.log('💾 [saveStartup] 既存のevaluationChartを保持');
+          }
+        }
+        if ((!data.evaluationChartSnapshots || data.evaluationChartSnapshots.length === 0) && existingData?.evaluationChartSnapshots) {
+          if (typeof existingData.evaluationChartSnapshots === 'string') {
+            try {
+              const parsed = JSON.parse(existingData.evaluationChartSnapshots);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                data.evaluationChartSnapshots = parsed;
+                console.log('💾 [saveStartup] 既存のevaluationChartSnapshotsを保持（JSON文字列からパース）');
+              }
+            } catch (e) {
+              console.warn('⚠️ [saveStartup] 既存のevaluationChartSnapshotsのパースに失敗:', e);
+            }
+          } else if (Array.isArray(existingData.evaluationChartSnapshots) && existingData.evaluationChartSnapshots.length > 0) {
+            data.evaluationChartSnapshots = existingData.evaluationChartSnapshots;
+            console.log('💾 [saveStartup] 既存のevaluationChartSnapshotsを保持');
+          }
+        }
+        console.log('💾 [saveStartup] 既存ドキュメントを更新:', startupId);
+      } else {
+        data.createdAt = now;
+        console.log('💾 [saveStartup] 新規ドキュメントを作成:', startupId);
+      }
+    } catch (getDocError: any) {
+      console.warn('⚠️ [saveStartup] 既存ドキュメント確認エラー（新規作成として続行）:', getDocError?.message || getDocError);
+      data.createdAt = now;
+    }
+    
+    console.log('💾 [saveStartup] setDoc呼び出し前:', { 
+      collectionName: 'startups', 
+      docId: startupId, 
+      data: {
+        id: data.id,
+        organizationId: data.organizationId,
+        title: data.title,
+        description: data.description ? data.description.substring(0, 50) + '...' : '',
+        content: data.content ? data.content.substring(0, 50) + '...' : '',
+        hasEvaluationChart: !!data.evaluationChart,
+        evaluationChartAxesCount: data.evaluationChart?.axes?.length || 0,
+        hasEvaluationChartSnapshots: Array.isArray(data.evaluationChartSnapshots) && data.evaluationChartSnapshots.length > 0,
+        evaluationChartSnapshotsCount: Array.isArray(data.evaluationChartSnapshots) ? data.evaluationChartSnapshots.length : 0,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        allDataKeys: Object.keys(data),
+        evaluationChartInData: 'evaluationChart' in data,
+        evaluationChartSnapshotsInData: 'evaluationChartSnapshots' in data,
+      }
+    });
+    
+    try {
+      // Tauri環境ではcallTauriCommandを使用
+      if (typeof window !== 'undefined' && '__TAURI__' in window) {
+        const { callTauriCommand } = await import('./localFirebase');
+        
+        // 配列やオブジェクトをJSON文字列に変換
+        const dataForDb: any = {
+          ...data,
+          method: Array.isArray(data.method) && data.method.length > 0 ? JSON.stringify(data.method) : null,
+          means: Array.isArray(data.means) && data.means.length > 0 ? JSON.stringify(data.means) : null,
+          relatedOrganizations: Array.isArray(data.relatedOrganizations) && data.relatedOrganizations.length > 0 ? JSON.stringify(data.relatedOrganizations) : null,
+          relatedGroupCompanies: Array.isArray(data.relatedGroupCompanies) && data.relatedGroupCompanies.length > 0 ? JSON.stringify(data.relatedGroupCompanies) : null,
+          methodDetails: data.methodDetails && Object.keys(data.methodDetails).length > 0 ? JSON.stringify(data.methodDetails) : null,
+          themeIds: Array.isArray(data.themeIds) && data.themeIds.length > 0 ? JSON.stringify(data.themeIds) : null,
+          topicIds: Array.isArray(data.topicIds) && data.topicIds.length > 0 ? JSON.stringify(data.topicIds) : null,
+          evaluationChart: data.evaluationChart ? JSON.stringify(data.evaluationChart) : null,
+          evaluationChartSnapshots: Array.isArray(data.evaluationChartSnapshots) && data.evaluationChartSnapshots.length > 0 ? JSON.stringify(data.evaluationChartSnapshots) : null,
+        };
+        
+        console.log('💾 [saveStartup] dataForDb確認:', {
+          hasEvaluationChart: !!dataForDb.evaluationChart,
+          evaluationChartType: typeof dataForDb.evaluationChart,
+          evaluationChartLength: typeof dataForDb.evaluationChart === 'string' ? dataForDb.evaluationChart.length : 'N/A',
+          evaluationChartPreview: typeof dataForDb.evaluationChart === 'string' ? dataForDb.evaluationChart.substring(0, 200) : dataForDb.evaluationChart,
+          hasEvaluationChartSnapshots: !!dataForDb.evaluationChartSnapshots,
+          evaluationChartSnapshotsType: typeof dataForDb.evaluationChartSnapshots,
+          dataForDbKeys: Object.keys(dataForDb),
+          evaluationChartInDataForDb: 'evaluationChart' in dataForDb,
+          evaluationChartSnapshotsInDataForDb: 'evaluationChartSnapshots' in dataForDb,
+        });
+        
+        await callTauriCommand('doc_set', {
+          collectionName: 'startups',
+          docId: startupId,
+          data: dataForDb,
+        });
+        
+        console.log('💾 [saveStartup] doc_set呼び出し後:', {
+          dataForDbKeys: Object.keys(dataForDb),
+          evaluationChartInDataForDb: 'evaluationChart' in dataForDb,
+        });
+        console.log('✅ [saveStartup] データベース保存成功（Tauri）:', startupId, {
+          title: data.title,
+          organizationId: data.organizationId,
+          hasEvaluationChart: !!data.evaluationChart,
+          hasEvaluationChartSnapshots: Array.isArray(data.evaluationChartSnapshots) && data.evaluationChartSnapshots.length > 0,
+        });
+      } else {
+        // フォールバック: Firestoreを使用
+        await setDoc(docRef, data);
+        console.log('✅ [saveStartup] データベース保存成功（Firestore）:', startupId, {
+          title: data.title,
+          hasEvaluationChart: !!data.evaluationChart,
+          hasEvaluationChartSnapshots: Array.isArray(data.evaluationChartSnapshots) && data.evaluationChartSnapshots.length > 0,
+        });
+      }
+    } catch (setDocError: any) {
+      console.error('❌ [saveStartup] setDoc呼び出しエラー:', {
+        error: setDocError,
+        errorMessage: setDocError?.message,
+        errorStack: setDocError?.stack,
+        collectionName: 'startups',
+        docId: startupId,
+        dataKeys: Object.keys(data),
+      });
+      throw new Error(`スタートアップの保存に失敗しました: ${setDocError?.message || '不明なエラー'}`);
+    }
+    
+    return startupId;
+  } catch (error: any) {
+    console.error('❌ [saveStartup] 保存失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * スタートアップを取得（ID指定）
+ */
+export async function getStartupById(startupId: string): Promise<Startup | null> {
+  try {
+    console.log('📖 [getStartupById] 開始:', { startupId });
+    
+    if (!startupId || startupId.trim() === '') {
+      console.warn('📖 [getStartupById] スタートアップIDが空です');
+      return null;
+    }
+    
+    const { callTauriCommand } = await import('./localFirebase');
+    
+    try {
+      const result = await callTauriCommand('doc_get', {
+        collectionName: 'startups',
+        docId: startupId,
+      });
+      
+      if (result && result.exists) {
+        const data = result.data || result;
+        
+        // デバッグ: evaluationChartの生データを確認
+        console.log('📖 [getStartupById] 生データ確認:', {
+          hasEvaluationChart: !!data.evaluationChart,
+          evaluationChartType: typeof data.evaluationChart,
+          evaluationChartValue: data.evaluationChart ? (typeof data.evaluationChart === 'string' ? data.evaluationChart.substring(0, 100) : data.evaluationChart) : null,
+          evaluationChartLength: typeof data.evaluationChart === 'string' ? data.evaluationChart.length : 'N/A',
+          hasEvaluationChartSnapshots: !!data.evaluationChartSnapshots,
+          evaluationChartSnapshotsType: typeof data.evaluationChartSnapshots,
+          allDataKeys: Object.keys(data),
+        });
+        
+        // JSON文字列を配列にパースするヘルパー関数
+        const parseJsonArray = (value: any): string[] => {
+          if (Array.isArray(value)) {
+            return value;
+          }
+          if (typeof value === 'string') {
+            try {
+              const parsed = JSON.parse(value);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+              console.warn('⚠️ [getStartupById] JSONパースエラー:', e, 'value:', value);
+              return [];
+            }
+          }
+          return [];
+        };
+        
+        // JSON文字列をオブジェクトにパースするヘルパー関数
+        const parseJsonObject = (value: any): any => {
+          if (value === null || value === undefined) {
+            return null;
+          }
+          if (typeof value === 'object' && !Array.isArray(value)) {
+            return value;
+          }
+          if (typeof value === 'string') {
+            try {
+              return JSON.parse(value);
+            } catch (e) {
+              console.warn('⚠️ [getStartupById] JSONパースエラー:', e, 'value:', value);
+              return null;
+            }
+          }
+          return null;
+        };
+        
+        const startup: Startup = {
+          id: data.id || startupId,
+          organizationId: data.organizationId,
+          title: data.title || '',
+          description: data.description || '',
+          content: data.content || '',
+          assignee: data.assignee || '',
+          method: parseJsonArray(data.method),
+          methodOther: data.methodOther || '',
+          methodDetails: parseJsonObject(data.methodDetails) || {},
+          means: parseJsonArray(data.means),
+          meansOther: data.meansOther || '',
+          objective: data.objective || '',
+          evaluation: data.evaluation || '',
+          evaluationChart: parseJsonObject(data.evaluationChart),
+          evaluationChartSnapshots: (() => {
+            if (!data.evaluationChartSnapshots) {
+              return [];
+            }
+            if (Array.isArray(data.evaluationChartSnapshots)) {
+              return data.evaluationChartSnapshots;
+            }
+            if (typeof data.evaluationChartSnapshots === 'string') {
+              try {
+                const parsed = JSON.parse(data.evaluationChartSnapshots);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch (e) {
+                console.warn('⚠️ [getStartupById] evaluationChartSnapshots JSONパースエラー:', e);
+                return [];
+              }
+            }
+            return [];
+          })(),
+          considerationPeriod: data.considerationPeriod || '',
+          executionPeriod: data.executionPeriod || '',
+          monetizationPeriod: data.monetizationPeriod || '',
+          relatedOrganizations: parseJsonArray(data.relatedOrganizations),
+          relatedGroupCompanies: parseJsonArray(data.relatedGroupCompanies),
+          monetizationDiagram: data.monetizationDiagram || '',
+          monetizationDiagramId: data.monetizationDiagramId || '',
+          relationDiagram: data.relationDiagram || '',
+          relationDiagramId: data.relationDiagramId || '',
+          causeEffectDiagramId: data.causeEffectDiagramId || '',
+          themeId: data.themeId || '',
+          themeIds: parseJsonArray(data.themeIds),
+          topicIds: parseJsonArray(data.topicIds),
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+        
+        console.log('✅ [getStartupById] 取得成功:', {
+          id: startup.id,
+          title: startup.title,
+          organizationId: startup.organizationId,
+          hasEvaluationChart: !!startup.evaluationChart,
+          evaluationChartAxesCount: startup.evaluationChart?.axes?.length || 0,
+          evaluationChartSnapshotsCount: startup.evaluationChartSnapshots?.length || 0,
+          evaluationChartType: typeof startup.evaluationChart,
+          evaluationChartSnapshotsType: typeof startup.evaluationChartSnapshots,
+          rawEvaluationChartType: typeof data.evaluationChart,
+          rawEvaluationChartSnapshotsType: typeof data.evaluationChartSnapshots,
+        });
+        
+        return startup;
+      }
+      
+      console.warn('📖 [getStartupById] データが見つかりませんでした。result:', result);
+      return null;
+    } catch (docError: any) {
+      console.error('📖 [getStartupById] doc_getエラー:', docError);
+      return null;
+    }
+  } catch (error: any) {
+    console.error('❌ [getStartupById] エラー:', error);
+    return null;
+  }
+}
+
+/**
+ * スタートアップを削除
+ */
+export async function deleteStartup(startupId: string): Promise<void> {
+  try {
+    console.log('🗑️ [deleteStartup] 開始:', startupId);
+    
+    const { callTauriCommand } = await import('./localFirebase');
+    
+    try {
+      await callTauriCommand('doc_delete', {
+        collectionName: 'startups',
+        docId: startupId,
+      });
+      
+      console.log('✅ [deleteStartup] 削除成功:', startupId);
+    } catch (deleteError: any) {
+      const errorMessage = deleteError?.message || String(deleteError || '');
+      console.error('❌ [deleteStartup] 削除失敗:', {
+        error: deleteError,
+        errorMessage,
+        startupId,
+      });
+      throw new Error(`スタートアップの削除に失敗しました: ${errorMessage || '不明なエラー'}`);
+    }
+  } catch (error: any) {
+    console.error('❌ [deleteStartup] エラー:', error);
     throw error;
   }
 }

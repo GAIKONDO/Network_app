@@ -1,0 +1,423 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { getStartupById, saveStartup, getOrgTreeFromDb, getThemes, type Theme, getAllTopicsBatch, type TopicInfo, getAllMeetingNotes, getOrgMembers, getAllOrganizationsFromTree, generateUniqueId, type Startup, type OrgNodeData } from '@/lib/orgApi';
+import type { MeetingNote } from '@/lib/orgApi';
+
+// 開発環境でのみログを有効化するヘルパー関数
+const isDev = process.env.NODE_ENV === 'development';
+const devLog = (...args: any[]) => {
+  if (isDev) {
+    console.log(...args);
+  }
+};
+const devWarn = (...args: any[]) => {
+  if (isDev) {
+    console.warn(...args);
+  }
+};
+
+interface UseStartupDataReturn {
+  // データ
+  startup: Startup | null;
+  orgData: OrgNodeData | null;
+  themes: Theme[];
+  topics: TopicInfo[];
+  orgMembers: Array<{ id: string; name: string; position?: string }>;
+  allOrgMembers: Array<{ id: string; name: string; position?: string; organizationId?: string }>;
+  allOrganizations: Array<{ id: string; name: string; title?: string }>;
+  allMeetingNotes: MeetingNote[];
+  orgTreeForModal: OrgNodeData | null;
+  
+  // 状態
+  loading: boolean;
+  error: string | null;
+  
+  // ローカル状態の初期値
+  initialLocalState: {
+    assignee: string[];
+    description: string;
+    method: string[];
+    methodOther: string;
+    means: string[];
+    meansOther: string;
+    objective: string;
+    evaluation: string;
+    evaluationChart: any;
+    evaluationChartSnapshots: any[];
+    considerationPeriod: string;
+    executionPeriod: string;
+    monetizationPeriod: string;
+    relatedOrganizations: string[];
+    relatedGroupCompanies: string[];
+    monetizationDiagram: string;
+    relationDiagram: string;
+    causeEffectCode: string;
+    themeIds: string[];
+    topicIds: string[];
+    content: string;
+  };
+  
+  // セッター
+  setStartup: (startup: Startup | null) => void;
+  setOrgData: (orgData: OrgNodeData | null) => void;
+  setThemes: (themes: Theme[]) => void;
+  setTopics: (topics: TopicInfo[]) => void;
+  setOrgMembers: (members: Array<{ id: string; name: string; position?: string }>) => void;
+  setAllOrgMembers: (members: Array<{ id: string; name: string; position?: string; organizationId?: string }>) => void;
+  setAllOrganizations: (orgs: Array<{ id: string; name: string; title?: string }>) => void;
+  setAllMeetingNotes: (notes: MeetingNote[]) => void;
+  setOrgTreeForModal: (tree: OrgNodeData | null) => void;
+  setError: (error: string | null) => void;
+}
+
+export function useStartupData(
+  organizationId: string | null,
+  startupId: string | null
+): UseStartupDataReturn {
+  const [startup, setStartup] = useState<Startup | null>(null);
+  const [orgData, setOrgData] = useState<OrgNodeData | null>(null);
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [topics, setTopics] = useState<TopicInfo[]>([]);
+  const [orgMembers, setOrgMembers] = useState<Array<{ id: string; name: string; position?: string }>>([]);
+  const [allOrgMembers, setAllOrgMembers] = useState<Array<{ id: string; name: string; position?: string; organizationId?: string }>>([]);
+  const [allOrganizations, setAllOrganizations] = useState<Array<{ id: string; name: string; title?: string }>>([]);
+  const [allMeetingNotes, setAllMeetingNotes] = useState<MeetingNote[]>([]);
+  const [orgTreeForModal, setOrgTreeForModal] = useState<OrgNodeData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [initialLocalState, setInitialLocalState] = useState<UseStartupDataReturn['initialLocalState']>({
+    assignee: [],
+    description: '',
+    method: [],
+    methodOther: '',
+    means: [],
+    meansOther: '',
+    objective: '',
+    evaluation: '',
+    evaluationChart: null,
+    evaluationChartSnapshots: [],
+    considerationPeriod: '',
+    executionPeriod: '',
+    monetizationPeriod: '',
+    relatedOrganizations: [],
+    relatedGroupCompanies: [],
+    monetizationDiagram: '',
+    relationDiagram: '',
+    causeEffectCode: '',
+    themeIds: [],
+    topicIds: [],
+    content: '',
+  });
+  
+  const isInitialLoadRef = useRef(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!organizationId || !startupId) {
+        setError('組織IDまたはスタートアップIDが指定されていません');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // 組織データを取得
+        let orgTree: OrgNodeData | null = null;
+        if (organizationId) {
+          orgTree = await getOrgTreeFromDb();
+          const findOrganization = (node: OrgNodeData): OrgNodeData | null => {
+            if (node.id === organizationId) {
+              return node;
+            }
+            if (node.children) {
+              for (const child of node.children) {
+                const found = findOrganization(child);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+          const foundOrg = orgTree ? findOrganization(orgTree) : null;
+          setOrgData(foundOrg);
+        } else {
+          setOrgData(null);
+        }
+        
+        // テーマを取得
+        const themesData = await getThemes();
+        setThemes(themesData);
+        
+        // すべての組織を取得（モーダル用）
+        let modalOrgTree: OrgNodeData | null = null;
+        if (orgTree) {
+          modalOrgTree = orgTree;
+        } else {
+          try {
+            modalOrgTree = await getOrgTreeFromDb();
+          } catch (treeError: any) {
+            devWarn('⚠️ [ページ] モーダル用組織ツリー取得に失敗:', treeError);
+          }
+        }
+        
+        if (modalOrgTree) {
+          const allOrgs = getAllOrganizationsFromTree(modalOrgTree);
+          setAllOrganizations(allOrgs);
+          setOrgTreeForModal(modalOrgTree);
+        } else {
+          setAllOrganizations([]);
+          setOrgTreeForModal(null);
+        }
+        
+        // 組織のメンバーを取得
+        if (organizationId) {
+          try {
+            const membersData = await getOrgMembers(organizationId);
+            const membersList = membersData.map((member: any) => ({
+              id: member.id,
+              name: member.name,
+              position: member.position || undefined,
+            }));
+            setOrgMembers(membersList);
+            devLog('✅ [ページ] メンバー取得完了:', { count: membersList.length });
+          } catch (memberError: any) {
+            console.warn('⚠️ [ページ] メンバー取得に失敗:', memberError);
+            setOrgMembers([]);
+          }
+          
+          // 全組織のメンバーを取得
+          if (modalOrgTree) {
+            try {
+              const allOrgsForMembers = getAllOrganizationsFromTree(modalOrgTree);
+              const allMembersList: Array<{ id: string; name: string; position?: string; organizationId?: string }> = [];
+              
+              for (const org of allOrgsForMembers) {
+                try {
+                  const orgMembersData = await getOrgMembers(org.id);
+                  const orgMembersList = orgMembersData.map((member: any) => ({
+                    id: member.id,
+                    name: member.name,
+                    position: member.position || undefined,
+                    organizationId: org.id,
+                  }));
+                  allMembersList.push(...orgMembersList);
+                } catch (err) {
+                  devWarn(`⚠️ [ページ] 組織 ${org.id} のメンバー取得に失敗:`, err);
+                }
+              }
+              
+              const uniqueMembers = new Map<string, { id: string; name: string; position?: string; organizationId?: string }>();
+              allMembersList.forEach(member => {
+                if (!uniqueMembers.has(member.name) || !uniqueMembers.get(member.name)?.position) {
+                  uniqueMembers.set(member.name, member);
+                }
+              });
+              
+              setAllOrgMembers(Array.from(uniqueMembers.values()));
+              devLog('✅ [ページ] 全組織メンバー取得完了:', { count: Array.from(uniqueMembers.values()).length });
+            } catch (allMemberError: any) {
+              devWarn('⚠️ [ページ] 全組織メンバー取得に失敗:', allMemberError);
+              setAllOrgMembers([]);
+            }
+          }
+        } else {
+          setOrgMembers([]);
+          setAllOrgMembers([]);
+        }
+        
+        // すべての議事録を取得
+        const allNotes = await getAllMeetingNotes();
+        setAllMeetingNotes(allNotes);
+        
+        // スタートアップを取得
+        const startupData = await getStartupById(startupId);
+        if (!startupData) {
+          setError('スタートアップが見つかりませんでした');
+          setLoading(false);
+          return;
+        }
+        
+        // organizationIdが指定されている場合、取得したデータのorganizationIdと一致するか確認
+        if (organizationId) {
+          devLog('🔍 [ページ] organizationId検証:', {
+            urlOrganizationId: organizationId,
+            dataOrganizationId: startupData.organizationId,
+            hasOrganizationId: !!startupData.organizationId,
+            match: startupData.organizationId === organizationId,
+          });
+          if (!startupData.organizationId || startupData.organizationId !== organizationId) {
+            setError('スタートアップが見つかりませんでした（組織IDが一致しません）');
+            setLoading(false);
+            return;
+          }
+        }
+        
+        devLog('📖 [ページ] データ読み込み:', {
+          id: startupData.id,
+          title: startupData.title,
+          contentLength: startupData.content?.length || 0,
+        });
+        
+        // monetizationDiagramIdが存在しない場合は生成
+        if (!startupData.monetizationDiagramId && startupData.monetizationDiagram) {
+          startupData.monetizationDiagramId = `md_${generateUniqueId()}`;
+          try {
+            await saveStartup({
+              ...startupData,
+              monetizationDiagramId: startupData.monetizationDiagramId,
+            });
+          } catch (saveError: any) {
+            devWarn('⚠️ [ページ] monetizationDiagramId保存エラー（続行します）:', saveError);
+          }
+        }
+        
+        // relationDiagramIdが存在しない場合は生成
+        if (!startupData.relationDiagramId && startupData.relationDiagram) {
+          startupData.relationDiagramId = `rd_${generateUniqueId()}`;
+          try {
+            await saveStartup({
+              ...startupData,
+              relationDiagramId: startupData.relationDiagramId,
+            });
+          } catch (saveError: any) {
+            devWarn('⚠️ [ページ] relationDiagramId保存エラー（続行します）:', saveError);
+          }
+        }
+        
+        devLog('✅ [ページ] setStartup呼び出し前:', {
+          startupId: startupData.id,
+          title: startupData.title,
+        });
+        setStartup(startupData);
+        console.log('✅ [ページ] setStartup呼び出し後');
+        
+        // ローカル状態を初期化
+        const assigneeValue = startupData.assignee
+          ? (Array.isArray(startupData.assignee) 
+              ? startupData.assignee 
+              : startupData.assignee.split(',').map(s => s.trim()).filter(s => s.length > 0))
+          : [];
+        const descriptionValue = startupData.description || '';
+        const methodValue = Array.isArray(startupData.method) ? startupData.method : (startupData.method ? [startupData.method] : []);
+        const meansValue = Array.isArray(startupData.means) ? startupData.means : (startupData.means ? [startupData.means] : []);
+        const objectiveValue = startupData.objective || '';
+        const evaluationValue = startupData.evaluation || '';
+        const evaluationChartValue = startupData.evaluationChart || null;
+        const evaluationChartSnapshotsValue = Array.isArray(startupData.evaluationChartSnapshots) ? startupData.evaluationChartSnapshots : [];
+        const considerationPeriodValue = startupData.considerationPeriod || '';
+        const executionPeriodValue = startupData.executionPeriod || '';
+        const monetizationPeriodValue = startupData.monetizationPeriod || '';
+        const monetizationDiagramValue = startupData.monetizationDiagram || '';
+        const relationDiagramValue = startupData.relationDiagram || '';
+        
+        // 特性要因図のコードを生成
+        const generateCauseEffectCode = (startup: Startup): string => {
+          try {
+            return JSON.stringify({
+              spine: {
+                id: 'spine',
+                label: startup.title || '特性要因図',
+                type: 'spine',
+              },
+              method: startup.method || [],
+              means: startup.means || [],
+              objective: startup.objective || '',
+              title: startup.title || '',
+              description: startup.description || '',
+            }, null, 2);
+          } catch (error) {
+            return JSON.stringify({
+              spine: { id: 'spine', label: '特性要因図', type: 'spine' },
+              method: [],
+              means: [],
+              objective: '',
+              title: '',
+              description: '',
+            }, null, 2);
+          }
+        };
+        const causeEffectCodeValue = generateCauseEffectCode(startupData);
+        
+        // themeIdsを優先し、なければthemeIdから変換
+        const themeIdsValue = Array.isArray(startupData.themeIds) && startupData.themeIds.length > 0
+          ? startupData.themeIds
+          : (startupData.themeId ? [startupData.themeId] : []);
+        
+        // 個別トピックを取得
+        const topicsData = await getAllTopicsBatch();
+        setTopics(topicsData);
+        
+        devLog('📖 [ページ] 取得したトピック:', {
+          count: topicsData.length,
+          topicIdsFromStartupCount: Array.isArray(startupData.topicIds) ? startupData.topicIds.length : 0,
+        });
+        
+        const topicIdsValue = Array.isArray(startupData.topicIds) ? startupData.topicIds : [];
+        
+        // 初期ローカル状態を設定
+        setInitialLocalState({
+          assignee: assigneeValue,
+          description: descriptionValue,
+          method: methodValue,
+          methodOther: startupData.methodOther || '',
+          means: meansValue,
+          meansOther: startupData.meansOther || '',
+          objective: objectiveValue,
+          evaluation: evaluationValue,
+          evaluationChart: evaluationChartValue,
+          evaluationChartSnapshots: evaluationChartSnapshotsValue,
+          considerationPeriod: considerationPeriodValue,
+          executionPeriod: executionPeriodValue,
+          monetizationPeriod: monetizationPeriodValue,
+          relatedOrganizations: Array.isArray(startupData.relatedOrganizations) ? startupData.relatedOrganizations : [],
+          relatedGroupCompanies: Array.isArray(startupData.relatedGroupCompanies) ? startupData.relatedGroupCompanies : [],
+          monetizationDiagram: monetizationDiagramValue,
+          relationDiagram: relationDiagramValue,
+          causeEffectCode: causeEffectCodeValue,
+          themeIds: themeIdsValue,
+          topicIds: topicIdsValue,
+          content: startupData.content || '',
+        });
+        
+        devLog('📖 [ページ] ローカル状態設定完了');
+        
+        setError(null);
+        isInitialLoadRef.current = false;
+      } catch (err: any) {
+        console.error('データの読み込みエラー:', err);
+        setError(err.message || 'データの読み込みに失敗しました');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [organizationId, startupId]);
+
+  return {
+    startup,
+    orgData,
+    themes,
+    topics,
+    orgMembers,
+    allOrgMembers,
+    allOrganizations,
+    allMeetingNotes,
+    orgTreeForModal,
+    loading,
+    error,
+    initialLocalState,
+    setStartup,
+    setOrgData,
+    setThemes,
+    setTopics,
+    setOrgMembers,
+    setAllOrgMembers,
+    setAllOrganizations,
+    setAllMeetingNotes,
+    setOrgTreeForModal,
+    setError,
+  };
+}
+

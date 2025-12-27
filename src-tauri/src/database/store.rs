@@ -16,6 +16,7 @@ const ALLOWED_TABLES: &[&str] = &[
     "focusInitiatives",
     "meetingNotes",
     "regulations", // 制度テーブル
+    "startups", // スタートアップテーブル
     "themes",
     "topics", // topicEmbeddingsから統合
     "entities",

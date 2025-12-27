@@ -86,7 +86,8 @@ export function RelationshipDiagramTab({
     if (themes.length > 0) {
       themeManagement.initializeOrderedThemes(themes);
     }
-  }, [themes, themeManagement]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themes]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

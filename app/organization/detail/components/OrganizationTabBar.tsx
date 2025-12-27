@@ -1,6 +1,6 @@
 'use client';
 
-export type OrganizationTab = 'introduction' | 'focusAreas' | 'focusInitiatives' | 'meetingNotes' | 'regulations' | 'graphviz';
+export type OrganizationTab = 'introduction' | 'focusAreas' | 'startups' | 'focusInitiatives' | 'meetingNotes' | 'regulations' | 'graphviz';
 
 interface OrganizationTabBarProps {
   activeTab: OrganizationTab;
@@ -8,6 +8,7 @@ interface OrganizationTabBarProps {
   focusInitiativesCount?: number;
   meetingNotesCount?: number;
   regulationsCount?: number;
+  startupsCount?: number;
   graphvizCount?: number;
 }
 
@@ -17,11 +18,13 @@ export function OrganizationTabBar({
   focusInitiativesCount = 0,
   meetingNotesCount = 0,
   regulationsCount = 0,
+  startupsCount = 0,
   graphvizCount = 0
 }: OrganizationTabBarProps) {
   const tabs = [
     { id: 'introduction' as const, label: '組織紹介' },
     { id: 'focusAreas' as const, label: '注力領域' },
+    { id: 'startups' as const, label: `スタートアップ (${startupsCount})` },
     { id: 'focusInitiatives' as const, label: `注力施策 (${focusInitiativesCount})` },
     { id: 'meetingNotes' as const, label: `議事録 (${meetingNotesCount})` },
     { id: 'regulations' as const, label: `制度 (${regulationsCount})` },

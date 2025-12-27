@@ -592,6 +592,68 @@ impl Database {
         )?;
         init_log!("✅ regulationsテーブルを作成しました");
         
+        // startupsテーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS startups (
+                id TEXT PRIMARY KEY,
+                organizationId TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                content TEXT,
+                createdAt TEXT,
+                updatedAt TEXT,
+                FOREIGN KEY (organizationId) REFERENCES organizations(id)
+            )",
+            [],
+        )?;
+        init_log!("✅ startupsテーブルを作成しました");
+        
+        // startupsテーブルにevaluationChartとevaluationChartSnapshotsカラムを追加（マイグレーション）
+        let startups_columns_to_add = vec![
+            ("evaluationChart", "TEXT"),
+            ("evaluationChartSnapshots", "TEXT"),
+            ("assignee", "TEXT"),
+            ("method", "TEXT"),
+            ("methodOther", "TEXT"),
+            ("methodDetails", "TEXT"),
+            ("means", "TEXT"),
+            ("meansOther", "TEXT"),
+            ("objective", "TEXT"),
+            ("evaluation", "TEXT"),
+            ("considerationPeriod", "TEXT"),
+            ("executionPeriod", "TEXT"),
+            ("monetizationPeriod", "TEXT"),
+            ("relatedOrganizations", "TEXT"),
+            ("relatedGroupCompanies", "TEXT"),
+            ("monetizationDiagram", "TEXT"),
+            ("monetizationDiagramId", "TEXT"),
+            ("relationDiagram", "TEXT"),
+            ("relationDiagramId", "TEXT"),
+            ("causeEffectDiagramId", "TEXT"),
+            ("themeId", "TEXT"),
+            ("themeIds", "TEXT"),
+            ("topicIds", "TEXT"),
+        ];
+        for (column_name, column_type) in startups_columns_to_add {
+            let column_exists: bool = conn.query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('startups') WHERE name = ?1",
+                params![column_name],
+                |row| Ok(row.get::<_, i32>(0)? > 0),
+            ).unwrap_or(false);
+            
+            if !column_exists {
+                init_log!("📝 startupsテーブルにカラムを追加: {}", column_name);
+                if let Err(e) = conn.execute(
+                    &format!("ALTER TABLE startups ADD COLUMN {} {}", column_name, column_type),
+                    [],
+                ) {
+                    init_log!("⚠️  カラム追加エラー（既に存在する可能性があります）: {} - {}", column_name, e);
+                }
+            } else {
+                init_log!("ℹ️  startupsテーブルのカラム '{}' は既に存在します", column_name);
+            }
+        }
+        
         // focusInitiativesテーブルにcompanyIdカラムを追加（既存のテーブル用）
         let focus_initiatives_columns_to_add = vec![("companyId", "TEXT")];
         for (column_name, column_type) in focus_initiatives_columns_to_add {

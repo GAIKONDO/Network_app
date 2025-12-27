@@ -39,16 +39,6 @@ export function useRelationshipDiagramData({
     const diagramNodes: RelationshipNode[] = [];
     const diagramLinks: RelationshipLink[] = [];
 
-    const parentNodeId = 'parent-department';
-    if (orgData) {
-      diagramNodes.push({
-        id: parentNodeId,
-        label: '情報・通信部門',
-        type: 'organization',
-        data: { id: parentNodeId, name: '情報・通信部門', isParent: true },
-      });
-    }
-
     const themesToShow = selectedThemeId
       ? themes.filter((t) => t.id === selectedThemeId)
       : themes;
@@ -87,14 +77,6 @@ export function useRelationshipDiagramData({
         type: 'theme',
         data: theme,
       });
-
-      if (orgData) {
-        diagramLinks.push({
-          source: parentNodeId,
-          target: theme.id,
-          type: 'main',
-        });
-      }
 
       const relatedInitiatives = initiatives.filter((init) => 
         theme.initiativeIds?.includes(init.id) || 
