@@ -1,15 +1,19 @@
 'use client';
 
-interface DeleteConfirmModalProps {
+export interface DeleteConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  title?: string;
+  message?: string;
 }
 
 export default function DeleteConfirmModal({
   isOpen,
   onClose,
   onConfirm,
+  title,
+  message,
 }: DeleteConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -41,10 +45,10 @@ export default function DeleteConfirmModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>
-          行を削除しますか？
+          {title || '行を削除しますか？'}
         </h3>
-        <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '24px' }}>
-          この操作は取り消せません。この行を削除してもよろしいですか？
+        <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '24px', whiteSpace: 'pre-line' }}>
+          {message || 'この操作は取り消せません。この行を削除してもよろしいですか？'}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <button

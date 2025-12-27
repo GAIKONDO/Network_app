@@ -77,6 +77,8 @@ export function useAIChat(modelType: ModelType, selectedModel: string) {
     selectedAgent?: any,
     meetingNoteId?: string | null,
     itemId?: string | null,
+    regulationId?: string | null,
+    regulationItemId?: string | null,
     ragResults?: any[] // RAG検索結果（ファイル情報を含む）
   ): Promise<string> => {
     const aiStartTime = Date.now();
@@ -122,6 +124,10 @@ Toolを呼び出す場合は、上記の形式で指定してください。Tool
         ? `\n**現在の議事録ID:** ${meetingNoteId}${itemId ? `\n**現在のアイテムID:** ${itemId}` : ''}\nこの議事録IDを使用してformat_meeting_note_content Toolを呼び出してください。`
         : '\n**議事録ID:** 未指定\nユーザーの指示から議事録IDを抽出するか、利用可能な議事録一覧を提示してユーザーに尋ねてください。';
       
+      const regulationIdInfo = regulationId 
+        ? `\n**現在の制度ID:** ${regulationId}${regulationItemId ? `\n**現在のアイテムID:** ${regulationItemId}` : ''}\nこの制度IDを使用してformat_regulation_content Toolを呼び出してください。`
+        : '\n**制度ID:** 未指定\nユーザーの指示から制度IDを抽出するか、利用可能な制度一覧を提示してユーザーに尋ねてください。';
+      
       agentSection = `\n\n## 選択されたAgent
 
 現在、以下のAgentが選択されています：
@@ -132,6 +138,7 @@ Toolを呼び出す場合は、上記の形式で指定してください。Tool
 - **能力**: ${selectedAgent.capabilities?.join(', ') || 'なし'}
 - **利用可能なTool**: ${selectedAgent.tools?.join(', ') || 'なし'}
 ${meetingNoteIdInfo}
+${regulationIdInfo}
 
 ${selectedAgent.systemPrompt ? `\n**Agentシステムプロンプト:**\n${selectedAgent.systemPrompt}\n` : ''}
 
@@ -157,7 +164,29 @@ ${selectedAgent.systemPrompt ? `\n**Agentシステムプロンプト:**\n${selec
   - ユーザーのメッセージ全体が内容である可能性が高いので、それをrawContentとして渡してください
   - **format_meeting_note_content Toolを呼び出した後、整形結果を表示し、「この内容で登録しますか？」と確認してください**
   - ユーザーが「登録する」「保存する」「はい」「OK」などと回答した場合、再度format_meeting_note_content Toolを呼び出してください（**save: true**で呼び出してください）
-  - 保存が完了したら、「議事録の内容を更新しました」とユーザーに伝えてください`;
+  - 保存が完了したら、「議事録の内容を更新しました」とユーザーに伝えてください
+
+- 制度編集に関する場合：
+  - ユーザーの指示から制度IDを抽出してください（パターン: "制度ID: xxx", "regulationId: xxx", "ID: xxx"など）
+  - 制度IDが抽出できた場合、ユーザーに「制度にする内容を教えてください」と問い返してください
+  - ユーザーが内容を提供したら、format_regulation_content Toolを呼び出してください（**save: false**で呼び出してください）
+  - 制度IDが含まれていない場合、利用可能な制度一覧を提示して、ユーザーに制度IDを尋ねてください
+  - format_regulation_content Toolの引数:
+    - regulationId: 制度ID（必須。現在の制度IDが指定されている場合はそれを使用）
+    - itemId: アイテムID（個別制度アイテムを指定する場合。オプション）
+    - rawContent: 整形する内容（**ユーザーが提供したテキストをそのまま渡してください。これは必須です。**）
+    - options: { splitTopics: true, generateSummaries: true, extractKeywords: true, generateSemanticCategory: true }
+    - modelType: ${selectedAgent.modelType || 'gpt'}
+    - selectedModel: ${selectedAgent.selectedModel || 'gpt-5-mini'}
+    - **save: false**（最初の呼び出しでは必ずfalseにしてください。保存は確認後に行います）
+  
+  **特に重要な注意:**
+  - ユーザーが内容を提供した場合、その内容を**必ずrawContent引数として渡してください**
+  - rawContentが空の場合、Toolの実行が失敗します
+  - ユーザーのメッセージ全体が内容である可能性が高いので、それをrawContentとして渡してください
+  - **format_regulation_content Toolを呼び出した後、整形結果を表示し、「この内容で登録しますか？」と確認してください**
+  - ユーザーが「登録する」「保存する」「はい」「OK」などと回答した場合、再度format_regulation_content Toolを呼び出してください（**save: true**で呼び出してください）
+  - 保存が完了したら、「制度の内容を更新しました」とユーザーに伝えてください`;
     }
 
     // システムプロンプトを構築

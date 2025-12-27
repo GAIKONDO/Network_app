@@ -94,6 +94,17 @@ export function ThreeScene({
         controls.target.set(0, 0, 0);
         controls.minDistance = 0.5;
         controls.maxDistance = 100;
+        
+        // パン機能を有効化（上下・左右の移動）
+        controls.enablePan = true;
+        controls.panSpeed = 1.0; // パンの速度
+        controls.screenSpacePanning = false; // カメラ空間でのパン（false）または画面空間でのパン（true）
+        
+        // マウスボタンの設定（Macでも使いやすくするため）
+        // デフォルト: 左=回転、右=パン、中=パン
+        // Shift+左ドラッグでもパンできるようにする（Macで右クリックが難しい場合のため）
+        // 注意: OrbitControlsのデフォルト動作では、Shift+左ドラッグは既にパンとして機能します
+        
         controlsRef.current = controls;
         
         // コールバックを再度呼び出し（controlsが設定された後）

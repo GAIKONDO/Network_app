@@ -576,6 +576,22 @@ impl Database {
             }
         }
         
+        // 制度テーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS regulations (
+                id TEXT PRIMARY KEY,
+                organizationId TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                content TEXT,
+                createdAt TEXT,
+                updatedAt TEXT,
+                FOREIGN KEY (organizationId) REFERENCES organizations(id)
+            )",
+            [],
+        )?;
+        init_log!("✅ regulationsテーブルを作成しました");
+        
         // focusInitiativesテーブルにcompanyIdカラムを追加（既存のテーブル用）
         let focus_initiatives_columns_to_add = vec![("companyId", "TEXT")];
         for (column_name, column_type) in focus_initiatives_columns_to_add {
@@ -1788,14 +1804,9 @@ impl Database {
             [],
         )?;
 
-        // Graphviz YAMLファイルテーブル（既存テーブルを削除して再作成）
-        // 注意: 既存データは破棄されます
-        init_log!("🔍 graphvizYamlFilesテーブルのマイグレーションを開始します...");
-        let _ = conn.execute("DROP TABLE IF EXISTS graphvizYamlFiles", []);
-        init_log!("✅ 既存のgraphvizYamlFilesテーブルを削除しました");
-        
+        // Graphviz YAMLファイルテーブル
         conn.execute(
-            "CREATE TABLE graphvizYamlFiles (
+            "CREATE TABLE IF NOT EXISTS graphvizYamlFiles (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT,
@@ -1822,7 +1833,6 @@ impl Database {
             )",
             [],
         )?;
-        init_log!("✅ 新しいgraphvizYamlFilesテーブルを作成しました");
 
         // Graphviz DOTファイルテーブル
         conn.execute(

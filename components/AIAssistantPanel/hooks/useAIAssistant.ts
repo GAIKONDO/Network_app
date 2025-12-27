@@ -19,6 +19,9 @@ export function useAIAssistant(
   // 最初に送った議事録IDとアイテムIDを保存
   const [savedMeetingNoteId, setSavedMeetingNoteId] = useState<string | null>(null);
   const [savedItemId, setSavedItemId] = useState<string | null>(null);
+  // 最初に送った制度IDとアイテムIDを保存
+  const [savedRegulationId, setSavedRegulationId] = useState<string | null>(null);
+  const [savedRegulationItemId, setSavedRegulationItemId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -69,6 +72,8 @@ export function useAIAssistant(
       // Agentが変更された場合、保存されたIDをリセット
       setSavedMeetingNoteId(null);
       setSavedItemId(null);
+      setSavedRegulationId(null);
+      setSavedRegulationItemId(null);
       previousAgentRef.current = selectedAgent;
     } else if (!selectedAgent && previousAgent) {
       // Agentが解除された場合、Agent選択メッセージを削除
@@ -76,6 +81,8 @@ export function useAIAssistant(
       // Agentが解除された場合、保存されたIDをリセット
       setSavedMeetingNoteId(null);
       setSavedItemId(null);
+      setSavedRegulationId(null);
+      setSavedRegulationItemId(null);
       previousAgentRef.current = null;
     } else if (!previousAgent && selectedAgent) {
       // 初回選択の場合
@@ -192,6 +199,42 @@ export function useAIAssistant(
     return match ? match[1] : null;
   };
 
+  // 現在のページから制度IDを抽出（URLパラメータから）
+  const extractRegulationIdFromURL = (): string | null => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const regulationId = urlParams.get('regulationId');
+      if (regulationId) {
+        console.log('[useAIAssistant] URLから制度IDを取得:', regulationId);
+        return regulationId;
+      }
+    }
+    return null;
+  };
+
+  // ユーザー入力から制度IDを抽出
+  const extractRegulationId = (input: string): string | null => {
+    // パターン1: "制度ID: xxx"
+    const pattern1 = /制度ID[：:]\s*([a-zA-Z0-9_-]+)/i;
+    // パターン2: "regulationId: xxx"
+    const pattern2 = /regulationId[：:]\s*([a-zA-Z0-9_-]+)/i;
+    // パターン3: "ID: xxx"（議事録IDと区別するため、文脈を確認）
+    const pattern3 = /制度.*ID[：:]\s*([a-zA-Z0-9_-]+)/i;
+    // パターン4: "制度 xxx を"
+    const pattern4 = /制度\s+([a-zA-Z0-9_-]+)\s+を/i;
+    // パターン5: "regulation-xxx" のような形式
+    const pattern5 = /(regulation-[a-zA-Z0-9_-]+)/i;
+    
+    // 各パターンを試す
+    const match = input.match(pattern1) || 
+                  input.match(pattern2) || 
+                  input.match(pattern3) || 
+                  input.match(pattern4) ||
+                  input.match(pattern5);
+    
+    return match ? match[1] : null;
+  };
+
   // ユーザーの回答が「登録する」「保存する」などの肯定的な回答かどうかを判定
   const isConfirmationResponse = (text: string): boolean => {
     const confirmationPatterns = [
@@ -255,6 +298,9 @@ export function useAIAssistant(
       let meetingNoteId: string | null = null;
       let itemId: string | null = null;
       let topicId: string | null = null;
+      // 制度IDを抽出（Agentが選択されている場合）
+      let regulationId: string | null = null;
+      let regulationItemId: string | null = null;
       if (selectedAgent) {
         // URLパラメータから取得を試みる
         const meetingIdFromURL = extractMeetingNoteIdFromURL();
@@ -727,7 +773,8 @@ export function useAIAssistant(
       // RAGコンテキストを取得
       const { context: ragContext, sources: ragSources, results: ragResults } = await getRAGContext(
         inputText,
-        organizationId
+        organizationId,
+        regulationId
       );
 
       // 最新のメッセージ履歴を取得（ユーザーメッセージを含むが、ローディングメッセージは除外）
@@ -743,6 +790,8 @@ export function useAIAssistant(
         selectedAgent,
         meetingNoteId,
         itemId,
+        regulationId,
+        regulationItemId,
         ragResults // RAG検索結果（ファイル情報を含む）
       );
 

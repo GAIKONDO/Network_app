@@ -33,6 +33,7 @@ export interface TopicSummary {
   semanticCategory?: string;
   keywords?: string[];
   meetingNoteId?: string;
+  regulationId?: string;
   organizationId?: string;
   files?: TopicFileInfo[]; // トピックに紐づくファイル情報
 }

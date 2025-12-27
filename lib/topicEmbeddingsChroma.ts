@@ -10,7 +10,7 @@ import {
   generateEnhancedEmbedding,
   generateMetadataEmbedding,
 } from './embeddings';
-import { getMeetingNoteById } from './orgApi';
+import { getMeetingNoteById, getRegulationById } from './orgApi';
 import type { TopicEmbedding, TopicMetadata } from '@/types/topicMetadata';
 
 /**
@@ -18,11 +18,12 @@ import type { TopicEmbedding, TopicMetadata } from '@/types/topicMetadata';
  */
 export async function saveTopicEmbeddingToChroma(
   topicId: string,
-  meetingNoteId: string,
+  meetingNoteId: string | undefined,
   organizationId: string,
   title: string,
   content: string,
-  metadata?: Partial<Pick<TopicMetadata, 'keywords' | 'semanticCategory' | 'tags' | 'summary' | 'importance'>>
+  metadata?: Partial<Pick<TopicMetadata, 'keywords' | 'semanticCategory' | 'tags' | 'summary' | 'importance'>>,
+  regulationId?: string
 ): Promise<void> {
   if (typeof window === 'undefined') {
     throw new Error('トピック埋め込みの保存はクライアント側でのみ実行可能です');
@@ -82,15 +83,28 @@ export async function saveTopicEmbeddingToChroma(
       throw new Error(`埋め込みベクトルの次元数が一致しません。期待値: 1536, 実際: ${combinedEmbedding.length}`);
     }
 
-    // 議事録タイトルを取得
-    let meetingNoteTitle = '';
-    try {
-      const meetingNote = await getMeetingNoteById(meetingNoteId);
-      if (meetingNote && meetingNote.title) {
-        meetingNoteTitle = meetingNote.title;
+    // 議事録または制度のタイトルを取得
+    let parentTitle = '';
+    const parentId = meetingNoteId || regulationId;
+    
+    if (meetingNoteId) {
+      try {
+        const meetingNote = await getMeetingNoteById(meetingNoteId);
+        if (meetingNote && meetingNote.title) {
+          parentTitle = meetingNote.title;
+        }
+      } catch (error) {
+        console.warn('議事録タイトルの取得に失敗しました:', error);
       }
-    } catch (error) {
-      console.warn('議事録タイトルの取得に失敗しました:', error);
+    } else if (regulationId) {
+      try {
+        const regulation = await getRegulationById(regulationId);
+        if (regulation && regulation.title) {
+          parentTitle = regulation.title;
+        }
+      } catch (error) {
+        console.warn('制度タイトルの取得に失敗しました:', error);
+      }
     }
 
     // contentSummaryを生成
@@ -101,7 +115,6 @@ export async function saveTopicEmbeddingToChroma(
     // メタデータを準備
     const embeddingMetadata: Record<string, any> = {
       topicId,
-      meetingNoteId,
       organizationId,
       title,
       contentSummary,
@@ -110,15 +123,24 @@ export async function saveTopicEmbeddingToChroma(
       tags: metadata?.tags ? JSON.stringify(metadata.tags) : '',
       summary: metadata?.summary || '',
       importance: metadata?.importance || '',
-      meetingNoteTitle,
+      parentTitle,
       createdAt: now,
       updatedAt: now,
     };
+    
+    // meetingNoteIdまたはregulationIdを設定
+    if (meetingNoteId) {
+      embeddingMetadata.meetingNoteId = meetingNoteId;
+    }
+    if (regulationId) {
+      embeddingMetadata.regulationId = regulationId;
+    }
 
     // Rust側のTauriコマンドを呼び出し
     await callTauriCommand('chromadb_save_topic_embedding', {
       topicId,
-      meetingNoteId,
+      meetingNoteId: meetingNoteId || undefined,
+      regulationId: regulationId || undefined,
       organizationId,
       combinedEmbedding: combinedEmbedding || [],
       metadata: embeddingMetadata,
@@ -189,7 +211,7 @@ export async function findSimilarTopicsChroma(
   limit: number = 5,
   organizationId?: string,
   semanticCategory?: string
-): Promise<Array<{ topicId: string; meetingNoteId: string; similarity: number; title?: string; contentSummary?: string; organizationId?: string }>> {
+): Promise<Array<{ topicId: string; meetingNoteId?: string; regulationId?: string; similarity: number; title?: string; contentSummary?: string; organizationId?: string }>> {
   if (typeof window === 'undefined') {
     return [];
   }
@@ -211,7 +233,8 @@ export async function findSimilarTopicsChroma(
       organizationId: organizationId || undefined,
     }) as Array<{
       topic_id: string;
-      meeting_note_id: string;
+      meeting_note_id?: string | null;
+      regulation_id?: string | null;
       similarity: number;
       title: string;
       content_summary: string;
@@ -224,7 +247,8 @@ export async function findSimilarTopicsChroma(
         console.warn(`トピック ${result.topic_id} のsimilarityが無効です:`, result.similarity);
         return {
           topicId: result.topic_id,
-          meetingNoteId: result.meeting_note_id,
+          meetingNoteId: result.meeting_note_id || undefined,
+          regulationId: result.regulation_id || undefined,
           similarity: 0,
           title: result.title,
           contentSummary: result.content_summary,
@@ -233,7 +257,8 @@ export async function findSimilarTopicsChroma(
       }
       return {
         topicId: result.topic_id,
-        meetingNoteId: result.meeting_note_id,
+        meetingNoteId: result.meeting_note_id || undefined,
+        regulationId: result.regulation_id || undefined,
         similarity: result.similarity,
         title: result.title,
         contentSummary: result.content_summary,

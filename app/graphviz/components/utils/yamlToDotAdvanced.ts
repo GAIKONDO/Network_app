@@ -393,17 +393,31 @@ export function mergeYamlFiles(files: Array<{ content: string; type: string }>):
  * ノードIDをエスケープ
  */
 function escapeNodeId(id: string): string {
+  if (!id || typeof id !== 'string') {
+    return 'undefined';
+  }
+  // 英数字とアンダースコアのみの場合はそのまま返す
   if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id)) {
     return id;
   }
-  return `"${id.replace(/"/g, '\\"')}"`;
+  // 特殊文字が含まれている場合は引用符で囲み、内部の引用符とバックスラッシュをエスケープ
+  return `"${id.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 /**
  * ラベルをエスケープ
  */
 function escapeLabel(label: string): string {
-  return label.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+  if (!label || typeof label !== 'string') {
+    return '';
+  }
+  return label
+    .replace(/\\/g, '\\\\')  // バックスラッシュをエスケープ（最初に処理）
+    .replace(/"/g, '\\"')     // ダブルクォートをエスケープ
+    .replace(/\n/g, '\\n')    // 改行をエスケープ
+    .replace(/\r/g, '')       // キャリッジリターンを削除
+    .replace(/\t/g, ' ')      // タブをスペースに変換
+    .replace(/[\x00-\x1F]/g, ''); // 制御文字を削除
 }
 
 /**
@@ -468,19 +482,41 @@ function generateSiteTopologyView(data: any): string {
 function generateSiteEquipmentView(data: any): string {
   let dotCode = '';
   
-  if (!data.racks || data.racks.length === 0) {
+  // 新しいフォーマット対応: rack（単数）とracks（複数）の両方に対応
+  let racksToProcess: any[] = [];
+  
+  // 従来のフォーマット: racks配列
+  if (data.racks && Array.isArray(data.racks)) {
+    racksToProcess = data.racks;
+  }
+  // 新しいフォーマット: rack（単数）オブジェクト
+  else if (data.rack && typeof data.rack === 'object') {
+    racksToProcess = [data.rack];
+  }
+  
+  if (racksToProcess.length === 0) {
     return '  // ラックデータがありません\n';
   }
+
+  console.log('🔄 [generateSiteEquipmentView] フォーマット検出:', {
+    hasRacks: !!(data.racks && Array.isArray(data.racks)),
+    racksCount: data.racks?.length || 0,
+    hasRack: !!(data.rack && typeof data.rack === 'object'),
+    rackId: data.rack?.id,
+    racksToProcessCount: racksToProcess.length,
+  });
 
   // ラッククラスターのリストを保持（横並びにするため）
   const rackClusters: string[] = [];
 
   // ラックをクラスターとして表示
-  for (const rack of data.racks) {
+  for (const rack of racksToProcess) {
+    // クラスター名は引用符なしの識別子である必要がある（特殊文字をアンダースコアに置換）
+    const clusterId = rack.id.replace(/[^a-zA-Z0-9_]/g, '_');
     const rackId = escapeNodeId(rack.id);
     const rackLabel = rack.label || rack.id;
     
-    dotCode += `  subgraph cluster_${rackId} {\n`;
+    dotCode += `  subgraph cluster_${clusterId} {\n`;
     dotCode += `    label="${escapeLabel(rackLabel)}";\n`;
     dotCode += `    style=rounded;\n`;
     dotCode += `    rankdir=LR;\n`;  // クラスター内で横方向に配置（サーバーを縦に並べる）
@@ -497,42 +533,94 @@ function generateSiteEquipmentView(data: any): string {
     ];\n`;
     
     // ラック内の機器を表示
-    const equipmentNodes: string[] = [rackId]; // ラックノードを最初に追加
+    const equipmentNodes: Array<{ id: string; uStart: number }> = []; // U位置情報を含む配列
     
-    if (rack.equipment && Array.isArray(rack.equipment)) {
-      for (const equipment of rack.equipment) {
+    // 新しいフォーマット対応: devicesとequipmentの両方に対応
+    const devices = (rack.devices && Array.isArray(rack.devices)) 
+      ? rack.devices 
+      : (rack.equipment && Array.isArray(rack.equipment)) 
+        ? rack.equipment 
+        : [];
+    
+    // U位置を取得するヘルパー関数
+    const getUStart = (equipment: any): number => {
+      // 新しいフォーマット: position_u配列（例: [30, 41]）
+      if (equipment.position_u && Array.isArray(equipment.position_u) && equipment.position_u.length >= 1) {
+        return equipment.position_u[0];
+      }
+      // 従来のフォーマット: position.unit文字列（例: "1-4"）または数値（例: 25）
+      if (equipment.position?.unit !== undefined && equipment.position?.unit !== null) {
+        const unitValue = equipment.position.unit;
+        if (typeof unitValue === 'number') {
+          return unitValue;
+        } else if (typeof unitValue === 'string') {
+          // "1-4"形式をパース
+          const match = unitValue.trim().match(/^(\d+)(?:-(\d+))?$/);
+          if (match) {
+            return parseInt(match[1], 10);
+          }
+        }
+      }
+      // U位置が不明な場合は最後に配置（大きな値）
+      return 9999;
+    };
+    
+    if (devices.length > 0) {
+      // 機器をU位置でソート（上から下へ、U位置の大きい順：下が低いUnit、上が高いUnit）
+      const sortedDevices = [...devices].sort((a, b) => {
+        const uA = getUStart(a);
+        const uB = getUStart(b);
+        return uB - uA; // 降順（大きい順）
+      });
+      
+      for (const equipment of sortedDevices) {
+        // server_groupタイプの場合は展開しない（グループとして表示）
+        if (equipment.type === 'server_group') {
+          const groupLabel = equipment.label || `${equipment.model || 'Server Group'} (${equipment.count || 0}台)`;
+          const eqId = escapeNodeId(equipment.id);
+          const uStart = getUStart(equipment);
+          dotCode += `    ${eqId} [label="${escapeLabel(groupLabel)}", shape=box3d, style="rounded,filled", fillcolor=lightyellow, color=orange, penwidth=2];\n`;
+          equipmentNodes.push({ id: eqId, uStart });
+          continue;
+        }
+        
         const eqId = escapeNodeId(equipment.id);
         const eqLabel = equipment.label || equipment.id;
         const eqType = equipment.type || 'unknown';
+        const uStart = getUStart(equipment);
         
         // 機器タイプに応じて色を変更
         let fillColor = 'lightgray';
         let borderColor = 'gray';
-        if (eqType === 'server') {
+        if (eqType === 'server' || eqType === 'server_group') {
           fillColor = 'lightyellow';
           borderColor = 'orange';
-        } else if (eqType === 'switch') {
+        } else if (eqType === 'switch' || eqType === 'spine' || eqType === 'server_leaf' || eqType === 'oob_leaf') {
           fillColor = 'lightcyan';
           borderColor = 'cyan';
         } else if (eqType === 'router') {
           fillColor = 'lightpink';
           borderColor = 'pink';
+        } else if (eqType === 'pdu') {
+          fillColor = 'lightgreen';
+          borderColor = 'green';
         }
         
         dotCode += `    ${eqId} [label="${escapeLabel(eqLabel)}", shape=box3d, style="rounded,filled", fillcolor=${fillColor}, color=${borderColor}, penwidth=1.5];\n`;
-        equipmentNodes.push(eqId);
+        equipmentNodes.push({ id: eqId, uStart });
       }
     }
     
-    // ノードを縦に並べるために不可視の接続を追加
+    // ノードをU位置順に縦に並べるために不可視の接続を追加
     for (let i = 0; i < equipmentNodes.length - 1; i++) {
-      dotCode += `    ${equipmentNodes[i]} -> ${equipmentNodes[i + 1]} [style=invis];\n`;
+      dotCode += `    ${equipmentNodes[i].id} -> ${equipmentNodes[i + 1].id} [style=invis];\n`;
     }
     
     dotCode += '  }\n';
     
     // ラッククラスターのIDを保存（横並びにするため）
-    rackClusters.push(rackId);
+    // クラスター名は引用符なしの識別子を使用
+    rackClusters.push(clusterId);
   }
   
   // ラックを横並びにするために、各ラックの最初のノード（ラックノード）を同じランクに配置
@@ -544,7 +632,70 @@ function generateSiteEquipmentView(data: any): string {
 
   dotCode += '\n';
 
-  // 機器間の接続を表示
+  // デバイスIDマップを作成（デバイスタイプから実際のデバイスIDへのマッピング）
+  const deviceIdMap = new Map<string, string>();
+  for (const rack of racksToProcess) {
+    const devices = (rack.devices && Array.isArray(rack.devices)) 
+      ? rack.devices 
+      : (rack.equipment && Array.isArray(rack.equipment)) 
+        ? rack.equipment 
+        : [];
+    
+    for (const device of devices) {
+      // デバイスIDをマップに追加
+      deviceIdMap.set(device.id, device.id);
+      // デバイスタイプもマップに追加（例: "server" -> "servers_upper" または最初に見つかったデバイス）
+      if (device.type && !deviceIdMap.has(device.type)) {
+        deviceIdMap.set(device.type, device.id);
+      }
+    }
+  }
+  
+  console.log('🔄 [generateSiteEquipmentView] デバイスIDマップ:', {
+    deviceIds: Array.from(deviceIdMap.keys()),
+    deviceIdMapEntries: Array.from(deviceIdMap.entries()),
+  });
+  
+  // 接続を処理するヘルパー関数
+  const processConnection = (fromDevice: string, toDevice: string, label?: string, style?: string) => {
+    // デバイスタイプから実際のデバイスIDを取得
+    let actualFromDevice = deviceIdMap.get(fromDevice) || fromDevice;
+    let actualToDevice = deviceIdMap.get(toDevice) || toDevice;
+    
+    const fromId = escapeNodeId(actualFromDevice);
+    const toId = escapeNodeId(actualToDevice);
+    
+    // ノードIDがundefinedでないことを確認
+    if (!fromId || !toId || fromId === 'undefined' || toId === 'undefined') {
+      console.warn('⚠️ [generateSiteEquipmentView] ノードIDが無効です:', { 
+        fromDevice, 
+        toDevice, 
+        actualFromDevice,
+        actualToDevice,
+        fromId, 
+        toId,
+        deviceIdMapKeys: Array.from(deviceIdMap.keys()),
+      });
+      return false;
+    }
+    
+    const attributes: string[] = [];
+    if (label) {
+      attributes.push(`label="${escapeLabel(label)}"`);
+    }
+    if (style) {
+      attributes.push(`style=${style}`);
+    }
+    
+    if (attributes.length > 0) {
+      dotCode += `  ${fromId} -> ${toId} [${attributes.join(', ')}];\n`;
+    } else {
+      dotCode += `  ${fromId} -> ${toId};\n`;
+    }
+    return true;
+  };
+
+  // 機器間の接続を表示（従来のフォーマット）
   if (data.connections && Array.isArray(data.connections)) {
     for (const conn of data.connections) {
       if (!conn.from || !conn.to) continue;
@@ -640,6 +791,88 @@ function generateSiteEquipmentView(data: any): string {
       }
     }
   }
+  
+  // 新しいフォーマットの接続処理
+  // power_connections処理
+  if (data.power_connections && Array.isArray(data.power_connections)) {
+    for (const conn of data.power_connections) {
+      const fromDevice = conn.from;
+      const toDevice = conn.to;
+      if (!fromDevice || !toDevice) continue;
+      
+      const cableType = data.cable_types?.[conn.cable];
+      const spec = cableType?.spec || conn.cable || '';
+      const count = conn.count || 1;
+      const label = `${spec} (${count}本)`;
+      processConnection(fromDevice, toDevice, label, 'dashed');
+    }
+  }
+  
+  // data_connections処理
+  if (data.data_connections && Array.isArray(data.data_connections)) {
+    for (const conn of data.data_connections) {
+      const fromDevice = conn.from;
+      const toDevice = conn.to;
+      if (!fromDevice || !toDevice) continue;
+      
+      const cableType = data.cable_types?.[conn.cable];
+      let labelParts: string[] = [];
+      
+      if (cableType) {
+        if (cableType.spec) labelParts.push(cableType.spec);
+        if (cableType.speed) labelParts.push(cableType.speed);
+      } else if (conn.cable) {
+        labelParts.push(conn.cable);
+      }
+      
+      if (conn.count && conn.count > 1) {
+        labelParts.push(`(${conn.count}本)`);
+      }
+      if (conn.purpose) {
+        labelParts.push(`[${conn.purpose}]`);
+      }
+      if (conn.range) {
+        labelParts.push(`(${conn.range})`);
+      }
+      
+      const label = labelParts.join(' ');
+      processConnection(fromDevice, toDevice, label);
+    }
+  }
+  
+  // optional_connections処理（条件付き接続）
+  if (data.optional_connections && data.optional_connections.links && Array.isArray(data.optional_connections.links)) {
+    for (const conn of data.optional_connections.links) {
+      const fromDevice = conn.from;
+      const toDevice = conn.to;
+      if (!fromDevice || !toDevice) continue;
+      
+      const cableType = data.cable_types?.[conn.cable];
+      let labelParts: string[] = [];
+      
+      if (cableType) {
+        if (cableType.spec) labelParts.push(cableType.spec);
+        if (cableType.speed) labelParts.push(cableType.speed);
+      } else if (conn.cable) {
+        labelParts.push(conn.cable);
+      }
+      
+      if (conn.count && conn.count > 1) {
+        labelParts.push(`(${conn.count}本)`);
+      }
+      
+      const condition = data.optional_connections.condition || 'optional';
+      labelParts.push(`[${condition}]`);
+      
+      const label = labelParts.join(' ');
+      processConnection(fromDevice, toDevice, label, 'dotted');
+    }
+  }
+
+  console.log('✅ [generateSiteEquipmentView] DOTコード生成完了:', {
+    dotCodeLength: dotCode.length,
+    dotCodePreview: dotCode.substring(0, 500),
+  });
 
   return dotCode;
 }

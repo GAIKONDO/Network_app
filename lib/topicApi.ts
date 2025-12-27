@@ -25,7 +25,8 @@ export interface TopicFileInfo {
  */
 export interface TopicSearchInfo {
   topicId: string;
-  meetingNoteId: string;
+  meetingNoteId?: string;
+  regulationId?: string;
   title: string;
   content: string;
   summary?: string;
@@ -44,9 +45,16 @@ export interface TopicSearchInfo {
  */
 export async function getTopicById(
   topicId: string,
-  meetingNoteId: string
+  meetingNoteId?: string,
+  regulationId?: string
 ): Promise<TopicSearchInfo | null> {
   try {
+    const parentId = meetingNoteId || regulationId;
+    if (!parentId) {
+      console.warn(`[getTopicById] meetingNoteIdまたはregulationIdが必要です: topicId=${topicId}`);
+      return null;
+    }
+    
     // Graphvizのトピックの場合は、topicsテーブルから直接取得
     if (meetingNoteId && meetingNoteId.startsWith('graphviz_')) {
       console.log(`[getTopicById] Graphvizトピックのため、topicsテーブルから直接取得: topicId=${topicId}, meetingNoteId=${meetingNoteId}`);
@@ -64,6 +72,7 @@ export async function getTopicById(
           return {
             topicId: topicData.topicId || topicId,
             meetingNoteId: topicData.meetingNoteId || meetingNoteId,
+            regulationId: topicData.regulationId,
             title: topicData.title || '',
             content: topicData.content || '',
             summary: topicData.description || topicData.contentSummary,
@@ -83,37 +92,73 @@ export async function getTopicById(
       return null;
     }
     
-    // 通常の議事録からトピック情報を取得
-    const { getTopicsByMeetingNote } = await import('./orgApi');
-    const topics = await getTopicsByMeetingNote(meetingNoteId);
-    
-    console.log(`[getTopicById] 取得したトピック数: ${topics.length}, topicId=${topicId}, meetingNoteId=${meetingNoteId}`);
-    if (topics.length > 0) {
-      console.log(`[getTopicById] トピックIDのサンプル:`, topics.slice(0, 3).map(t => t.id));
+    // 議事録または制度からトピック情報を取得
+    if (meetingNoteId) {
+      const { getTopicsByMeetingNote } = await import('./orgApi');
+      const topics = await getTopicsByMeetingNote(meetingNoteId);
+      
+      console.log(`[getTopicById] 取得したトピック数: ${topics.length}, topicId=${topicId}, meetingNoteId=${meetingNoteId}`);
+      if (topics.length > 0) {
+        console.log(`[getTopicById] トピックIDのサンプル:`, topics.slice(0, 3).map(t => t.id));
+      }
+      
+      const topic = topics.find(t => t.id === topicId);
+      if (!topic) {
+        console.warn(`[getTopicById] トピックが見つかりません: topicId=${topicId}, meetingNoteId=${meetingNoteId}`);
+        console.warn(`[getTopicById] 利用可能なトピックID:`, topics.map(t => t.id));
+        return null;
+      }
+      
+      // TopicInfoをTopicSearchInfoに変換
+      return {
+        topicId: topic.id,
+        meetingNoteId: topic.meetingNoteId,
+        title: topic.title,
+        content: topic.content,
+        summary: topic.summary,
+        semanticCategory: topic.semanticCategory,
+        importance: topic.importance,
+        organizationId: topic.organizationId,
+        keywords: topic.keywords || [], // キーワードも含める
+        createdAt: topic.topicDate || undefined,
+        updatedAt: topic.topicDate || undefined,
+        searchCount: 0, // デフォルト値
+      };
+    } else if (regulationId) {
+      const { getTopicsByRegulation } = await import('./orgApi');
+      const topics = await getTopicsByRegulation(regulationId);
+      
+      console.log(`[getTopicById] 取得したトピック数: ${topics.length}, topicId=${topicId}, regulationId=${regulationId}`);
+      if (topics.length > 0) {
+        console.log(`[getTopicById] トピックIDのサンプル:`, topics.slice(0, 3).map(t => t.id));
+      }
+      
+      const topic = topics.find(t => t.id === topicId);
+      if (!topic) {
+        console.warn(`[getTopicById] トピックが見つかりません: topicId=${topicId}, regulationId=${regulationId}`);
+        console.warn(`[getTopicById] 利用可能なトピックID:`, topics.map(t => t.id));
+        return null;
+      }
+      
+      // TopicInfoをTopicSearchInfoに変換
+      return {
+        topicId: topic.id,
+        meetingNoteId: topic.meetingNoteId, // 制度IDが入っている可能性がある
+        regulationId: regulationId,
+        title: topic.title,
+        content: topic.content,
+        summary: topic.summary,
+        semanticCategory: topic.semanticCategory,
+        importance: topic.importance,
+        organizationId: topic.organizationId,
+        keywords: topic.keywords || [], // キーワードも含める
+        createdAt: topic.topicDate || undefined,
+        updatedAt: topic.topicDate || undefined,
+        searchCount: 0, // デフォルト値
+      };
     }
     
-    const topic = topics.find(t => t.id === topicId);
-    if (!topic) {
-      console.warn(`[getTopicById] トピックが見つかりません: topicId=${topicId}, meetingNoteId=${meetingNoteId}`);
-      console.warn(`[getTopicById] 利用可能なトピックID:`, topics.map(t => t.id));
-      return null;
-    }
-    
-    // TopicInfoをTopicSearchInfoに変換
-    return {
-      topicId: topic.id,
-      meetingNoteId: topic.meetingNoteId,
-      title: topic.title,
-      content: topic.content,
-      summary: topic.summary,
-      semanticCategory: topic.semanticCategory,
-      importance: topic.importance,
-      organizationId: topic.organizationId,
-      keywords: [], // キーワードはメタデータから取得する必要がある
-      createdAt: topic.topicDate || undefined,
-      updatedAt: topic.topicDate || undefined,
-      searchCount: 0, // デフォルト値
-    };
+    return null;
   } catch (error) {
     console.error(`[getTopicById] エラー:`, error);
     return null;
@@ -124,10 +169,10 @@ export async function getTopicById(
  * 複数のトピックIDでトピック情報を一括取得（N+1問題の解決）
  */
 export async function getTopicsByIds(
-  topicIdsWithMeetingNoteIds: Array<{ topicId: string; meetingNoteId: string }>,
+  topicIdsWithParentIds: Array<{ topicId: string; meetingNoteId?: string; regulationId?: string }>,
   concurrencyLimit: number = 5
 ): Promise<TopicSearchInfo[]> {
-  if (topicIdsWithMeetingNoteIds.length === 0) {
+  if (topicIdsWithParentIds.length === 0) {
     return [];
   }
 
@@ -136,12 +181,12 @@ export async function getTopicsByIds(
 
   try {
     const results = await Promise.allSettled(
-      topicIdsWithMeetingNoteIds.map(({ topicId, meetingNoteId }) =>
+      topicIdsWithParentIds.map(({ topicId, meetingNoteId, regulationId }) =>
         limit(async () => {
           try {
-            return await getTopicById(topicId, meetingNoteId);
+            return await getTopicById(topicId, meetingNoteId, regulationId);
           } catch (error: any) {
-            console.error(`[getTopicsByIds] トピック取得エラー (${topicId}, ${meetingNoteId}):`, error);
+            console.error(`[getTopicsByIds] トピック取得エラー (${topicId}, meetingNoteId=${meetingNoteId}, regulationId=${regulationId}):`, error);
             return null;
           }
         })

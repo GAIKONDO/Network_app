@@ -232,7 +232,16 @@ export async function getKnowledgeGraphContextWithResults(
         const scoreText = typeof result.score === 'number' && !isNaN(result.score)
           ? ` (関連度: ${(result.score * 100).toFixed(1)}%)`
           : '';
-        contextParts.push(`- **${topic.title}**${scoreText}`);
+        
+        // 制度のトピックの場合、リンクを追加
+        let linkText = '';
+        if (topic.regulationId) {
+          linkText = ` [制度ページ: /organization/detail/regulation?regulationId=${topic.regulationId}${result.topicId ? `&topicId=${result.topicId}` : ''}]`;
+        } else if (result.meetingNoteId) {
+          linkText = ` [議事録ページ: /organization/meeting?meetingId=${result.meetingNoteId}${result.topicId ? `&topicId=${result.topicId}` : ''}]`;
+        }
+        
+        contextParts.push(`- **${topic.title}**${scoreText}${linkText}`);
         
         // ファイル情報のデバッグログ
         console.log(`[getKnowledgeGraphContextWithResults] トピック ${topic.topicId} のファイル情報:`, {

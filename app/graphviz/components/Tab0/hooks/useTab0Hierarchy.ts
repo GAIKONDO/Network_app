@@ -84,8 +84,18 @@ export function useTab0Hierarchy({
             setSiteEquipment(equipment);
             
             const newRackServersMap = new Map<string, RackServers>();
-            if (equipment.racks && Array.isArray(equipment.racks)) {
-              for (const rack of equipment.racks) {
+            // 従来のフォーマット: racks配列
+            const racks = equipment.racks && Array.isArray(equipment.racks) 
+              ? equipment.racks 
+              : [];
+            // 新しいフォーマット: rack（単数）オブジェクト
+            const singleRack = (equipment as any).rack && typeof (equipment as any).rack === 'object'
+              ? [(equipment as any).rack]
+              : [];
+            const allRacks = racks.length > 0 ? racks : singleRack;
+            
+            if (allRacks.length > 0) {
+              for (const rack of allRacks) {
                 try {
                   const rackServersData = await getRackServersByRackId(rack.id, organizationId || undefined);
                   if (rackServersData) {
@@ -213,9 +223,15 @@ export function useTab0Hierarchy({
                     if (!f.yamlContent) return false;
                     try {
                       const siteEqParsed = yaml.load(f.yamlContent) as any;
-                      const hasRack = siteEqParsed?.racks?.some((r: any) => r.id === rackId);
+                      // 従来のフォーマット: racks配列
+                      const hasRackInRacks = siteEqParsed?.racks?.some((r: any) => r.id === rackId);
+                      // 新しいフォーマット: rack（単数）オブジェクト
+                      const hasRackInRack = siteEqParsed?.rack && typeof siteEqParsed.rack === 'object' && siteEqParsed.rack.id === rackId;
+                      const hasRack = hasRackInRacks || hasRackInRack;
                       if (hasRack) {
-                        console.log('✅ [Tab0] site-equipmentファイルを発見:', f.id, f.name);
+                        console.log('✅ [Tab0] site-equipmentファイルを発見:', f.id, f.name, {
+                          format: hasRackInRacks ? 'racks配列' : 'rack単数',
+                        });
                       }
                       return hasRack;
                     } catch {
@@ -271,7 +287,12 @@ export function useTab0Hierarchy({
               setRackServers(servers);
               setServerDetails(serverDetailsData);
               
-              const rack = equipment.racks?.find(r => r.id === rackId);
+              // 従来のフォーマット: racks配列
+              let rack = equipment.racks?.find(r => r.id === rackId);
+              // 新しいフォーマット: rack（単数）オブジェクト
+              if (!rack && (equipment as any).rack && typeof (equipment as any).rack === 'object' && (equipment as any).rack.id === rackId) {
+                rack = (equipment as any).rack;
+              }
               const serverLabel = serverDetailsData.label || servers.servers?.find(s => s.id === initialServerId)?.label || initialServerId;
               
               if (rack) {
@@ -342,22 +363,32 @@ export function useTab0Hierarchy({
             const equipment = await getSiteEquipmentBySiteId(initialSiteId, organizationId || undefined);
             if (equipment) {
               navigateToLevel('sites', initialSiteId, equipment.label);
-              setSiteEquipment(equipment);
-              
-              const newRackServersMap = new Map<string, RackServers>();
-              if (equipment.racks && Array.isArray(equipment.racks)) {
-                for (const rack of equipment.racks) {
-                  try {
-                    const rackServersData = await getRackServersByRackId(rack.id, organizationId || undefined);
-                    if (rackServersData) {
-                      newRackServersMap.set(rack.id, rackServersData);
-                    }
-                  } catch (err) {
-                    console.warn(`⚠️ [Tab0] ラック "${rack.id}" のサーバー情報取得に失敗:`, err);
+            setSiteEquipment(equipment);
+            
+            const newRackServersMap = new Map<string, RackServers>();
+            // 従来のフォーマット: racks配列
+            const racks = equipment.racks && Array.isArray(equipment.racks) 
+              ? equipment.racks 
+              : [];
+            // 新しいフォーマット: rack（単数）オブジェクト
+            const singleRack = (equipment as any).rack && typeof (equipment as any).rack === 'object'
+              ? [(equipment as any).rack]
+              : [];
+            const allRacks = racks.length > 0 ? racks : singleRack;
+            
+            if (allRacks.length > 0) {
+              for (const rack of allRacks) {
+                try {
+                  const rackServersData = await getRackServersByRackId(rack.id, organizationId || undefined);
+                  if (rackServersData) {
+                    newRackServersMap.set(rack.id, rackServersData);
                   }
+                } catch (err) {
+                  console.warn(`⚠️ [Tab0] ラック "${rack.id}" のサーバー情報取得に失敗:`, err);
                 }
               }
-              setRackServersMap(newRackServersMap);
+            }
+            setRackServersMap(newRackServersMap);
             }
           } else if (cardType === 'rack-servers' && initialRackId) {
             if (initialSiteId) {

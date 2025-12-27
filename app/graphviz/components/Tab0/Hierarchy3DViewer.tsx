@@ -379,7 +379,14 @@ export function Hierarchy3DViewer({
     rackServersMap: Map<string, RackServers>,
     camera: THREE.Camera
   ) => {
-    const racks = siteEquipment.racks || [];
+    // 新しいフォーマット対応: rack（単数）とracks（複数）の両方に対応
+    let racks: any[] = [];
+    if (siteEquipment.racks && Array.isArray(siteEquipment.racks)) {
+      racks = siteEquipment.racks;
+    } else if ((siteEquipment as any).rack && typeof (siteEquipment as any).rack === 'object') {
+      racks = [(siteEquipment as any).rack];
+    }
+    
     if (racks.length === 0) return;
 
     let minX = 0, maxX = 0, minY = 0, maxY = 0, minZ = 0, maxZ = 0;
@@ -514,7 +521,12 @@ export function Hierarchy3DViewer({
       rackPositions.set(rack.id, new THREE.Vector3(rackPos.x, rackPos.y + rackHeight / 2, rackPos.z));
 
       // 機器のラックマッピングと3D位置
-      const equipment = rack.equipment || [];
+      // 新しいフォーマット対応: devicesとequipmentの両方に対応
+      const equipment = (rack.devices && Array.isArray(rack.devices)) 
+        ? rack.devices 
+        : (rack.equipment && Array.isArray(rack.equipment)) 
+          ? rack.equipment 
+          : [];
       equipment.forEach((eq: any) => {
         deviceToRackMap.set(eq.id, rack.id);
         

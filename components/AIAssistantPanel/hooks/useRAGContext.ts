@@ -3,7 +3,8 @@ import type { RAGSource } from '../types';
 export function useRAGContext() {
   const getRAGContext = async (
     queryText: string,
-    organizationId?: string
+    organizationId?: string,
+    regulationId?: string | null
   ): Promise<{ context: string; sources: RAGSource[]; results?: any[] }> => {
     let ragContext = '';
     let ragSources: RAGSource[] = [];
@@ -33,6 +34,34 @@ export function useRAGContext() {
           relationResultsCount: kgContextResult.results.filter(r => r.type === 'relation').length,
           sourcesCount: kgContextResult.sources.length,
         });
+        
+        // 制度IDが指定されている場合、制度の詳細情報を取得してコンテキストに追加
+        if (regulationId) {
+          try {
+            const { getRegulationById } = await import('@/lib/orgApi');
+            const regulation = await getRegulationById(regulationId);
+            if (regulation) {
+              const regulationContext = `## 現在の制度情報
+
+**制度ID:** ${regulation.id}
+**タイトル:** ${regulation.title}
+**説明:** ${regulation.description || 'なし'}
+**組織ID:** ${regulation.organizationId}
+
+${regulation.content ? `**内容:**\n${regulation.content.substring(0, 500)}${regulation.content.length > 500 ? '...' : ''}` : ''}
+
+---
+`;
+              kgContextResult.context = regulationContext + '\n' + kgContextResult.context;
+              console.log('[useRAGContext] 制度情報をコンテキストに追加:', {
+                regulationId,
+                title: regulation.title,
+              });
+            }
+          } catch (regulationError) {
+            console.warn('[useRAGContext] 制度情報の取得に失敗:', regulationError);
+          }
+        }
         
         // トピック検索結果の詳細をログ出力
         const topicResults = kgContextResult.results.filter(r => r.type === 'topic');

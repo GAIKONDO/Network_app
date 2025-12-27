@@ -141,7 +141,6 @@ export default function CardView({
                     cursor: 'pointer',
                     flex: 1,
                     margin: 0,
-                    marginBottom: file.description ? '4px' : 0,
                   }}
                 >
                   {file.name}
@@ -227,16 +226,6 @@ export default function CardView({
               </div>
             )}
           </div>
-          {file.description && (
-            <p style={{
-              fontSize: '14px',
-              color: 'var(--color-text-light)',
-              margin: 0,
-              marginBottom: '8px',
-            }}>
-              {file.description}
-            </p>
-          )}
 
           <div style={{
             display: 'flex',

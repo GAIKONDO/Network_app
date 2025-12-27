@@ -36,6 +36,7 @@ export default function GraphvizTab({
   const [allFiles, setAllFiles] = useState<GraphvizYamlFile[]>([]); // すべてのファイルを保持
   const [isLoading, setIsLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; fileId: string; fileName: string } | null>(null);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState<{ isOpen: boolean; fileIds: string[] } | null>(null);
   
   // 階層フィルターの状態
   type HierarchyFilter = 'all' | 'site-topology' | 'site-equipment' | 'rack-servers' | 'server-details' | 'other';
@@ -91,11 +92,33 @@ export default function GraphvizTab({
   const loadFiles = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 組織IDでフィルタリング（将来的に実装）
-      // 現時点では、すべてのファイルを取得して、organizationIdでフィルタリング
+      // organizationIdを指定してファイルを取得（Rust側でフィルタリング）
+      // ただし、organizationIdがnullやundefinedのファイルも含めるため、全件取得してからフィルタリング
       const fetchedFiles = await getAllGraphvizYamlFiles();
-      // organizationIdでフィルタリング（organizationIdが一致するもののみ）
-      const orgFilteredFiles = fetchedFiles.filter(file => file.organizationId === organizationId);
+      console.log('[GraphvizTab] 取得したファイル数:', fetchedFiles.length);
+      console.log('[GraphvizTab] 取得したファイルのサンプル:', fetchedFiles.slice(0, 3).map(f => ({
+        id: f.id,
+        name: f.name,
+        organizationId: f.organizationId,
+        matches: f.organizationId === organizationId,
+      })));
+      
+      // organizationIdでフィルタリング（organizationIdが一致するもの、またはorganizationIdがnull/undefinedのものも含める）
+      // 注意: organizationIdがnullやundefinedのファイルは、すべての組織で表示される可能性がある
+      const orgFilteredFiles = fetchedFiles.filter(file => {
+        // organizationIdが一致する場合
+        if (file.organizationId === organizationId) {
+          return true;
+        }
+        // organizationIdがnull、undefined、または空文字列の場合も含める（後方互換性のため）
+        if (!file.organizationId || file.organizationId.trim() === '') {
+          console.log('[GraphvizTab] organizationIdが空のファイルを含めます:', file.id, file.name);
+          return true;
+        }
+        return false;
+      });
+      
+      console.log('[GraphvizTab] フィルタリング後のファイル数:', orgFilteredFiles.length);
       setAllFiles(orgFilteredFiles);
       
       // 階層フィルターを適用
@@ -130,8 +153,18 @@ export default function GraphvizTab({
       const filtered = getFilteredFiles(allFiles, hierarchyFilter);
       setFiles(filtered);
       onFilesChange?.(filtered.length);
+    } else {
+      // allFilesが空の場合も0件として通知
+      onFilesChange?.(0);
     }
   }, [allFiles, hierarchyFilter, getFilteredFiles, onFilesChange]);
+  
+  // 初期読み込み
+  useEffect(() => {
+    if (organizationId) {
+      loadFiles();
+    }
+  }, [organizationId, loadFiles]);
 
   // ファイルを削除
   const handleDelete = useCallback(async (fileId: string) => {
@@ -143,6 +176,26 @@ export default function GraphvizTab({
     } catch (error: any) {
       console.error('ファイルの削除に失敗:', error);
       alert(`ファイルの削除に失敗しました: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadFiles]);
+
+  // 一括削除ハンドラー
+  const handleBatchDelete = useCallback(async (fileIds: string[]) => {
+    if (fileIds.length === 0) return;
+    
+    setIsLoading(true);
+    try {
+      // すべてのファイルを削除
+      const deletePromises = fileIds.map(fileId => deleteGraphvizYamlFile(fileId));
+      await Promise.all(deletePromises);
+      await loadFiles(); // ファイル一覧を更新
+      setBatchDeleteConfirm(null);
+      alert(`${fileIds.length}件のファイルを削除しました。`);
+    } catch (error: any) {
+      console.error('一括削除に失敗:', error);
+      alert(`一括削除に失敗しました: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -662,10 +715,6 @@ description: ${description || ''}
     }
   }, [editingGraphvizName, loadFiles]);
 
-  useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
-
   return (
     <div ref={tabRef}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
@@ -795,6 +844,7 @@ description: ${description || ''}
           onSaveEdit={handleSaveEdit}
           onEditNameChange={setEditingGraphvizName}
           onDeleteClick={(fileId, fileName) => setDeleteConfirm({ isOpen: true, fileId, fileName })}
+          onBatchDeleteClick={(fileIds) => setBatchDeleteConfirm({ isOpen: true, fileIds })}
           getFilteredFiles={getFilteredFiles}
         />
       )}
@@ -836,6 +886,17 @@ description: ${description || ''}
           isOpen={deleteConfirm.isOpen}
           onClose={() => setDeleteConfirm(null)}
           onConfirm={() => handleDelete(deleteConfirm.fileId)}
+        />
+      )}
+
+      {/* 一括削除確認モーダル */}
+      {batchDeleteConfirm && (
+        <DeleteConfirmModal
+          isOpen={batchDeleteConfirm.isOpen}
+          onClose={() => setBatchDeleteConfirm(null)}
+          onConfirm={() => handleBatchDelete(batchDeleteConfirm.fileIds)}
+          title={`${batchDeleteConfirm.fileIds.length}件のファイルを削除しますか？`}
+          message={`選択した${batchDeleteConfirm.fileIds.length}件のファイルを削除してもよろしいですか？\nこの操作は取り消せません。`}
         />
       )}
     </div>

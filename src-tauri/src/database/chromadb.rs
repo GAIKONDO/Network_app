@@ -1523,13 +1523,16 @@ pub async fn find_similar_relations(
 /// トピック埋め込みを保存
 pub async fn save_topic_embedding(
     topic_id: String,
-    meeting_note_id: String,
+    meeting_note_id: Option<String>,
     organization_id: String,
     combined_embedding: Vec<f32>,
     metadata: HashMap<String, Value>,
+    regulation_id: Option<String>,
 ) -> Result<(), String> {
-    eprintln!("[save_topic_embedding] 開始: topicId={}, meetingNoteId={}, organizationId={}, embedding_dim={}", 
-        topic_id, meeting_note_id, organization_id, combined_embedding.len());
+    let parent_id = meeting_note_id.as_ref().or(regulation_id.as_ref());
+    let parent_id_str = parent_id.map(|s| s.as_str()).unwrap_or("unknown");
+    eprintln!("[save_topic_embedding] 開始: topicId={}, meetingNoteId={:?}, regulationId={:?}, organizationId={}, embedding_dim={}", 
+        topic_id, meeting_note_id, regulation_id, organization_id, combined_embedding.len());
     
     // クライアントが初期化されていない場合、自動的に初期化を試みる
     if CHROMADB_CLIENT.get().is_none() {
@@ -1604,8 +1607,15 @@ pub async fn save_topic_embedding(
     
     let mut embedding_metadata = metadata;
     embedding_metadata.insert("topicId".to_string(), Value::String(topic_id.clone()));
-    embedding_metadata.insert("meetingNoteId".to_string(), Value::String(meeting_note_id.clone()));
     embedding_metadata.insert("organizationId".to_string(), Value::String(organization_id.clone()));
+    
+    // meetingNoteIdまたはregulationIdを設定
+    if let Some(meeting_note_id) = meeting_note_id {
+        embedding_metadata.insert("meetingNoteId".to_string(), Value::String(meeting_note_id));
+    }
+    if let Some(regulation_id) = regulation_id {
+        embedding_metadata.insert("regulationId".to_string(), Value::String(regulation_id));
+    }
     
     // メタデータをChromaDBの形式に変換（serde_json::Mapを使用）
     let mut chroma_metadata = serde_json::Map::new();
@@ -1637,7 +1647,8 @@ pub async fn save_topic_embedding(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TopicSearchResult {
     pub topic_id: String,
-    pub meeting_note_id: String,
+    pub meeting_note_id: Option<String>,
+    pub regulation_id: Option<String>,
     pub similarity: f32,
     pub title: String,
     pub content_summary: String,
@@ -1685,13 +1696,20 @@ async fn search_topics_in_collection(
                                             .get(i)
                                             .and_then(|m_opt| m_opt.as_ref());
                                         
+                                        // メタデータからmeetingNoteIdまたはregulationIdを取得
                                         let meeting_note_id = metadata
                                             .and_then(|m| {
                                                 m.get("meetingNoteId")
                                                     .and_then(|v| v.as_str())
-                                            })
-                                            .unwrap_or("")
-                                            .to_string();
+                                                    .map(|s| s.to_string())
+                                            });
+                                        
+                                        let regulation_id = metadata
+                                            .and_then(|m| {
+                                                m.get("regulationId")
+                                                    .and_then(|v| v.as_str())
+                                                    .map(|s| s.to_string())
+                                            });
                                         
                                         // メタデータからtitleとcontentSummaryを取得
                                         let title = metadata
@@ -1721,6 +1739,7 @@ async fn search_topics_in_collection(
                                         similar_topics.push(TopicSearchResult {
                                             topic_id: topic_id.clone(),
                                             meeting_note_id,
+                                            regulation_id,
                                             similarity,
                                             title,
                                             content_summary,

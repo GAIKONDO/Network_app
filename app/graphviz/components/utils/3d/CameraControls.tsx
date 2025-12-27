@@ -194,7 +194,7 @@ export function CameraInstructions({ style }: { style?: React.CSSProperties }) {
         操作方法
       </div>
       <div>左ドラッグ: 回転</div>
-      <div>右ドラッグ: パン</div>
+      <div>右ドラッグ / Shift+左ドラッグ: パン（上下・左右移動）</div>
       <div>ホイール: ズーム</div>
       <div>クリック: 選択</div>
     </div>

@@ -82,6 +82,50 @@ export default function HeaderSection({
               {savingStatus === 'saving' ? '💾 保存中...' : '✅ 保存完了'}
             </div>
           )}
+          {downloadingJson && (
+            <div style={{
+              padding: '8px 12px',
+              fontSize: '12px',
+              color: '#6B7280',
+              backgroundColor: '#F3F4F6',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}>
+              <div style={{
+                width: '12px',
+                height: '12px',
+                border: '2px solid rgba(107, 114, 128, 0.3)',
+                borderTop: '2px solid #6B7280',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }} />
+              JSONダウンロード中...
+            </div>
+          )}
+          {downloadingHtml && (
+            <div style={{
+              padding: '8px 12px',
+              fontSize: '12px',
+              color: '#6B7280',
+              backgroundColor: '#F3F4F6',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}>
+              <div style={{
+                width: '12px',
+                height: '12px',
+                border: '2px solid rgba(107, 114, 128, 0.3)',
+                borderTop: '2px solid #6B7280',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }} />
+              HTMLダウンロード中...
+            </div>
+          )}
           <button
             onClick={onSave}
             disabled={savingStatus === 'saving'}

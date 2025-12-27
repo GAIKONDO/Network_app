@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getOrgTreeFromDb, findOrganizationById, getOrgMembers, getFocusInitiatives, getMeetingNotes, getOrganizationContent } from '@/lib/orgApi';
+import { getOrgTreeFromDb, findOrganizationById, getOrgMembers, getFocusInitiatives, getMeetingNotes, getRegulations, getOrganizationContent } from '@/lib/orgApi';
 import type { OrgNodeData } from '@/components/OrgChart';
-import type { FocusInitiative, MeetingNote, OrganizationContent } from '@/lib/orgApi';
+import type { FocusInitiative, MeetingNote, Regulation, OrganizationContent } from '@/lib/orgApi';
 import { sortMembersByPosition } from '@/lib/memberSort';
 
 // 開発環境でのみログを有効化するヘルパー関数（パフォーマンス最適化）
@@ -24,6 +24,8 @@ export interface UseOrganizationDataReturn {
   initiativesByOrg: Map<string, { orgName: string; initiatives: FocusInitiative[] }>;
   meetingNotes: MeetingNote[];
   setMeetingNotes: React.Dispatch<React.SetStateAction<MeetingNote[]>>;
+  regulations: Regulation[];
+  setRegulations: React.Dispatch<React.SetStateAction<Regulation[]>>;
   loading: boolean;
   error: string | null;
   reloadInitiatives: (orgId: string, orgTree: OrgNodeData | null) => Promise<void>;
@@ -35,6 +37,7 @@ export function useOrganizationData(organizationId: string | null): UseOrganizat
   const [focusInitiatives, setFocusInitiatives] = useState<FocusInitiative[]>([]);
   const [initiativesByOrg, setInitiativesByOrg] = useState<Map<string, { orgName: string; initiatives: FocusInitiative[] }>>(new Map());
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>([]);
+  const [regulations, setRegulations] = useState<Regulation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -423,6 +426,13 @@ export function useOrganizationData(organizationId: string | null): UseOrganizat
             } catch (noteError: any) {
               devWarn('議事録の取得に失敗しました:', noteError);
             }
+            
+            try {
+              const regulationsData = await getRegulations(validOrganizationId);
+              setRegulations(regulationsData);
+            } catch (regulationError: any) {
+              devWarn('制度の取得に失敗しました:', regulationError);
+            }
           } catch (memberError: any) {
             devWarn('メンバー情報の取得に失敗しました:', memberError);
             // 正しいIDを確実に設定
@@ -499,6 +509,8 @@ export function useOrganizationData(organizationId: string | null): UseOrganizat
     initiativesByOrg,
     meetingNotes,
     setMeetingNotes,
+    regulations,
+    setRegulations,
     loading,
     error,
     reloadInitiatives,

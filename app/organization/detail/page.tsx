@@ -10,15 +10,19 @@ import IntroductionTab from './components/tabs/IntroductionTab';
 import FocusAreasTab from './components/tabs/FocusAreasTab';
 import FocusInitiativesTab from './components/tabs/FocusInitiativesTab';
 import MeetingNotesTab from './components/tabs/MeetingNotesTab';
+import RegulationsTab from './components/tabs/RegulationsTab';
 import GraphvizTab from './components/tabs/GraphvizTab';
 import AddInitiativeModal from './components/modals/AddInitiativeModal';
 import DeleteInitiativeModal from './components/modals/DeleteInitiativeModal';
 import AddMeetingNoteModal from './components/modals/AddMeetingNoteModal';
 import DeleteMeetingNoteModal from './components/modals/DeleteMeetingNoteModal';
+import AddRegulationModal from './components/modals/AddRegulationModal';
+import DeleteRegulationModal from './components/modals/DeleteRegulationModal';
 import { OrganizationTabBar, type OrganizationTab } from './components/OrganizationTabBar';
 import { useOrganizationData } from './hooks/useOrganizationData';
 import { useInitiativeHandlers } from './hooks/useInitiativeHandlers';
 import { useMeetingNoteHandlers } from './hooks/useMeetingNoteHandlers';
+import { useRegulationHandlers } from './hooks/useRegulationHandlers';
 import { getAllGraphvizYamlFiles } from '@/lib/graphvizApi';
 
 // 開発環境でのみログを有効化するヘルパー関数（パフォーマンス最適化）
@@ -50,6 +54,8 @@ function OrganizationDetailPageContent() {
     initiativesByOrg,
     meetingNotes,
     setMeetingNotes,
+    regulations,
+    setRegulations,
     loading,
     error,
     reloadInitiatives,
@@ -64,6 +70,7 @@ function OrganizationDetailPageContent() {
   const focusAreasTabRef = useRef<HTMLDivElement>(null);
   const focusInitiativesTabRef = useRef<HTMLDivElement>(null);
   const meetingNotesTabRef = useRef<HTMLDivElement>(null);
+  const regulationsTabRef = useRef<HTMLDivElement>(null);
   const graphvizTabRef = useRef<HTMLDivElement>(null);
   
   // 注力施策関連のハンドラー
@@ -81,11 +88,19 @@ function OrganizationDetailPageContent() {
     meetingNotes,
     setMeetingNotes,
   });
+  
+  // 制度関連のハンドラー
+  const regulationHandlers = useRegulationHandlers({
+    organizationId,
+    organization,
+    regulations,
+    setRegulations,
+  });
 
 
   // タブパラメータが変更されたときにactiveTabを更新
   useEffect(() => {
-    if (tabParam && ['introduction', 'focusAreas', 'focusInitiatives', 'meetingNotes', 'graphviz'].includes(tabParam)) {
+    if (tabParam && ['introduction', 'focusAreas', 'focusInitiatives', 'meetingNotes', 'regulations', 'graphviz'].includes(tabParam)) {
       setActiveTab(tabParam);
     } else if (!tabParam) {
       setActiveTab('introduction');
@@ -130,6 +145,10 @@ function OrganizationDetailPageContent() {
       case 'meetingNotes':
         tabRef = meetingNotesTabRef;
         tabName = '議事録';
+        break;
+      case 'regulations':
+        tabRef = regulationsTabRef;
+        tabName = '制度';
         break;
       case 'graphviz':
         tabRef = graphvizTabRef;
@@ -262,6 +281,7 @@ function OrganizationDetailPageContent() {
           onTabChange={handleTabChange}
           focusInitiativesCount={focusInitiatives.length}
           meetingNotesCount={meetingNotes.length}
+          regulationsCount={regulations.length}
           graphvizCount={graphvizCount}
         />
 
@@ -348,6 +368,24 @@ function OrganizationDetailPageContent() {
           />
         )}
 
+        {activeTab === 'regulations' && (
+          <RegulationsTab
+            organizationId={organizationId}
+            regulations={regulations}
+            editingRegulationId={regulationHandlers.editingRegulationId}
+            editingRegulationTitle={regulationHandlers.editingRegulationTitle}
+            setEditingRegulationTitle={regulationHandlers.setEditingRegulationTitle}
+            savingRegulation={regulationHandlers.savingRegulation}
+            tabRef={regulationsTabRef}
+            onDownloadImage={handleDownloadTabImage}
+            onOpenAddModal={regulationHandlers.handleOpenAddRegulationModal}
+            onStartEdit={regulationHandlers.handleStartEditRegulation}
+            onCancelEdit={regulationHandlers.handleCancelEditRegulation}
+            onSaveEdit={regulationHandlers.handleSaveEditRegulation}
+            onDelete={regulationHandlers.handleDeleteRegulation}
+          />
+        )}
+
         {activeTab === 'graphviz' && (
           <GraphvizTab
             organizationId={organizationId}
@@ -382,6 +420,33 @@ function OrganizationDetailPageContent() {
           savingMeetingNote={meetingNoteHandlers.savingMeetingNote}
           onClose={meetingNoteHandlers.cancelDeleteMeetingNote}
           onConfirm={meetingNoteHandlers.confirmDeleteMeetingNote}
+        />
+
+        {/* 制度追加モーダル */}
+        <AddRegulationModal
+          isOpen={regulationHandlers.showAddRegulationModal}
+          newRegulationId={regulationHandlers.newRegulationId}
+          newRegulationTitle={regulationHandlers.newRegulationTitle}
+          newRegulationDescription={regulationHandlers.newRegulationDescription}
+          savingRegulation={regulationHandlers.savingRegulation}
+          onClose={() => {
+            regulationHandlers.setShowAddRegulationModal(false);
+            regulationHandlers.setNewRegulationTitle('');
+            regulationHandlers.setNewRegulationDescription('');
+            regulationHandlers.setNewRegulationId('');
+          }}
+          onSave={regulationHandlers.handleAddRegulation}
+          onTitleChange={regulationHandlers.setNewRegulationTitle}
+          onDescriptionChange={regulationHandlers.setNewRegulationDescription}
+        />
+
+        {/* 制度削除確認モーダル */}
+        <DeleteRegulationModal
+          isOpen={regulationHandlers.showDeleteRegulationConfirmModal && !!regulationHandlers.deleteTargetRegulationId}
+          regulationTitle={regulations.find(r => r.id === regulationHandlers.deleteTargetRegulationId)?.title || 'この制度'}
+          savingRegulation={regulationHandlers.savingRegulation}
+          onClose={regulationHandlers.cancelDeleteRegulation}
+          onConfirm={regulationHandlers.confirmDeleteRegulation}
         />
       </div>
     </Layout>

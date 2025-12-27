@@ -189,20 +189,29 @@ export default function SearchResultsList({
       {/* トピック（個別表示） */}
       {topics.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {topics.map((result, index) => (
-            <SearchResultItem
-              key={`${result.type}-${result.id}-${index}`}
-              result={result}
-              index={index}
-              isSelected={selectedResult?.id === result.id}
-              onSelect={onSelectResult}
-              onFeedback={onFeedback}
-              feedbackRating={feedbackRatings[result.id]}
-              entityTypeLabels={entityTypeLabels}
-              relationTypeLabels={relationTypeLabels}
-              searchResults={results}
-            />
-          ))}
+          {topics
+            .filter(result => {
+              // トピックの詳細が開いている場合、選択されたトピックのみを表示
+              if (selectedResult && selectedResult.type === 'topic') {
+                return result.id === selectedResult.id;
+              }
+              // 詳細が閉じている場合、すべてのトピックを表示
+              return true;
+            })
+            .map((result, index) => (
+              <SearchResultItem
+                key={`${result.type}-${result.id}-${index}`}
+                result={result}
+                index={index}
+                isSelected={selectedResult?.id === result.id}
+                onSelect={onSelectResult}
+                onFeedback={onFeedback}
+                feedbackRating={feedbackRatings[result.id]}
+                entityTypeLabels={entityTypeLabels}
+                relationTypeLabels={relationTypeLabels}
+                searchResults={results}
+              />
+            ))}
         </div>
       )}
     </div>

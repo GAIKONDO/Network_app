@@ -78,13 +78,46 @@ export default function SearchResultItem({
         // 議事録から組織IDを取得
         const meetingNote = await getMeetingNoteById(result.meetingNoteId);
         if (meetingNote && meetingNote.organizationId) {
-          router.push(`/organization/meeting?organizationId=${meetingNote.organizationId}&meetingId=${result.meetingNoteId}`);
+          // topicIdがある場合はURLパラメータに追加
+          const params = new URLSearchParams();
+          params.append('organizationId', meetingNote.organizationId);
+          params.append('meetingId', result.meetingNoteId);
+          if (result.topicId) {
+            params.append('topicId', result.topicId);
+          }
+          router.push(`/organization/meeting?${params.toString()}`);
         } else {
           alert('議事録の組織IDが取得できませんでした');
         }
       } catch (error) {
         console.error('議事録の取得エラー:', error);
         alert('議事録の取得に失敗しました');
+      }
+    }
+  };
+
+  const handleShowInRegulation = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (result.topic?.regulationId) {
+      try {
+        // 制度から組織IDを取得
+        const { getRegulationById } = await import('@/lib/orgApi');
+        const regulation = await getRegulationById(result.topic.regulationId);
+        if (regulation && regulation.organizationId) {
+          // topicIdがある場合はURLパラメータに追加
+          const params = new URLSearchParams();
+          params.append('id', regulation.organizationId); // 組織IDは'id'パラメータとして使用
+          params.append('regulationId', result.topic.regulationId);
+          if (result.topicId) {
+            params.append('topicId', result.topicId);
+          }
+          router.push(`/organization/detail/regulation?${params.toString()}`);
+        } else {
+          alert('制度の組織IDが取得できませんでした');
+        }
+      } catch (error) {
+        console.error('制度の取得エラー:', error);
+        alert('制度の取得に失敗しました');
       }
     }
   };
@@ -191,7 +224,7 @@ export default function SearchResultItem({
           )}
           {result.type === 'topic' && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1F2937', margin: 0 }}>
                   {result.topic?.title || 'トピック'}
                 </h3>
@@ -220,6 +253,33 @@ export default function SearchResultItem({
                     title={result.meetingNoteId.startsWith('graphviz_') ? 'Graphvizページで表示' : '議事録ページで表示'}
                   >
                     {result.meetingNoteId.startsWith('graphviz_') ? 'Graphvizで表示' : '議事録で表示'}
+                  </button>
+                )}
+                {result.topic?.regulationId && (
+                  <button
+                    onClick={handleShowInRegulation}
+                    style={{
+                      padding: '4px 8px',
+                      backgroundColor: 'transparent',
+                      color: '#10B981',
+                      border: '1px solid #10B981',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#10B981';
+                      e.currentTarget.style.color = '#FFFFFF';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#10B981';
+                    }}
+                    title="制度ページで表示"
+                  >
+                    制度で表示
                   </button>
                 )}
               </div>

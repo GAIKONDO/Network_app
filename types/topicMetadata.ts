@@ -110,9 +110,10 @@ export interface TopicMetadata {
  * トピック埋め込みデータ
  */
 export interface TopicEmbedding {
-  id: string;                        // トピックID (例: {meetingNoteId}-topic-{topicId})
+  id: string;                        // トピックID (例: {meetingNoteId}-topic-{topicId} または {regulationId}-topic-{topicId})
   topicId: string;                   // トピックのユニークID
-  meetingNoteId: string;             // 親議事録ID
+  meetingNoteId?: string;            // 親議事録ID（議事録の場合）
+  regulationId?: string;             // 親制度ID（制度の場合）
   organizationId: string;            // 組織ID
   
   // 基本情報（ChromaDBから取得時に必要）

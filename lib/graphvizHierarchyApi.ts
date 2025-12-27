@@ -387,20 +387,27 @@ export async function validateHierarchyReferences(
       }
     }
     
-    // 6. サーバーIDのセットを作成（タブ2のequipmentとタブ3のserversの両方から）
+    // 6. 機器IDのセットを作成（タブ2のequipment/devicesとタブ3のserversの両方から）
+    // server-detailsはサーバーだけでなく、すべての機器（switch, pdu, router等）の詳細を参照できる
     const serverIds = new Set<string>();
     
-    // タブ2（site-equipment）のequipmentからサーバーIDを取得
+    // タブ2（site-equipment）のequipment/devicesから機器IDを取得
     for (const equipment of siteEquipmentList) {
-      if (equipment.racks && Array.isArray(equipment.racks)) {
-        for (const rack of equipment.racks) {
-          if (rack.equipment && Array.isArray(rack.equipment)) {
-            for (const eq of rack.equipment) {
-              // equipmentのtypeが'server'の場合、そのIDをサーバーIDとして追加
-              if (eq.type === 'server' && eq.id) {
-                serverIds.add(eq.id);
-              }
-            }
+      // 新しいフォーマット対応: rack（単数）とracks（複数）の両方に対応
+      const racksToCheck = equipment.racks || (equipment.rack ? [equipment.rack] : []);
+      
+      for (const rack of racksToCheck) {
+        // 新しいフォーマット対応: devicesとequipmentの両方に対応
+        const devices = (rack.devices && Array.isArray(rack.devices)) 
+          ? rack.devices 
+          : (rack.equipment && Array.isArray(rack.equipment)) 
+            ? rack.equipment 
+            : [];
+        
+        for (const eq of devices) {
+          // すべての機器タイプ（server, switch, pdu, router, firewall, storage等）のIDを追加
+          if (eq.id) {
+            serverIds.add(eq.id);
           }
         }
       }
@@ -589,6 +596,15 @@ export async function getSiteEquipmentBySiteId(
         const parsedSiteId = parsed?.siteId ? String(parsed.siteId).trim() : null;
         const targetSiteId = siteId.trim();
         if (parsed?.type === 'site-equipment' && parsedSiteId === targetSiteId) {
+          console.log('✅ [getSiteEquipmentBySiteId] データを取得:', siteId, {
+            hasRacks: !!(parsed.racks && Array.isArray(parsed.racks)),
+            racksCount: parsed.racks?.length || 0,
+            hasRack: !!(parsed.rack && typeof parsed.rack === 'object'),
+            rackId: parsed.rack?.id,
+            hasDevices: !!(parsed.rack?.devices && Array.isArray(parsed.rack.devices)),
+            devicesCount: parsed.rack?.devices?.length || 0,
+          });
+          
           const result: SiteEquipment = {
             ...parsed,
             fileId: file.id,
@@ -597,7 +613,6 @@ export async function getSiteEquipmentBySiteId(
           // キャッシュに保存（5分間）
           cache.set(cacheKey, result, 5 * 60 * 1000);
           
-          console.log('✅ [getSiteEquipmentBySiteId] データを取得:', siteId);
           return result;
         }
       } catch (e) {

@@ -40,8 +40,13 @@ export function SiteEquipment3DViewer({
   const raycasterRef = useRef<THREE.Raycaster | null>(null);
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
 
-  // ラックリストを取得
-  const racks = siteEquipment?.racks || [];
+  // ラックリストを取得（新しいフォーマット対応: rack（単数）とracks（複数）の両方に対応）
+  let racks: any[] = [];
+  if (siteEquipment?.racks && Array.isArray(siteEquipment.racks)) {
+    racks = siteEquipment.racks;
+  } else if (siteEquipment?.rack && typeof siteEquipment.rack === 'object') {
+    racks = [siteEquipment.rack];
+  }
 
   const handleSceneReady = (
     scene: THREE.Scene,
@@ -132,11 +137,16 @@ export function SiteEquipment3DViewer({
       rackLabel.sync();
       scene.add(rackLabel);
 
-      // ラック内の機器を配置
-      const equipment = rack.equipment || [];
+      // ラック内の機器を配置（新しいフォーマット対応: devicesとequipmentの両方に対応）
+      const equipment = (rack.devices && Array.isArray(rack.devices)) 
+        ? rack.devices 
+        : (rack.equipment && Array.isArray(rack.equipment)) 
+          ? rack.equipment 
+          : [];
+      
       equipment.forEach((eq: any, eqIndex: number) => {
-        if (!eq.position?.unit) return;
-
+        // 新しいフォーマット対応: position_u配列形式とposition.unit文字列形式の両方に対応
+        // equipmentTo3DPosition関数内で処理されるため、ここではチェック不要
         const devicePos = equipmentTo3DPosition(eq, rackCapacity);
         if (!devicePos) return;
 
@@ -149,11 +159,16 @@ export function SiteEquipment3DViewer({
 
         // 機器の色（タイプに応じて）
         const equipmentColors: Record<string, number> = {
-          server: 0x2563eb,    // 青
-          switch: 0x16a34a,     // 緑
-          router: 0xdc2626,     // 赤
-          firewall: 0xea580c,   // オレンジ
-          storage: 0x9333ea,    // 紫
+          server: 0x2563eb,        // 青
+          server_group: 0x2563eb, // 青（サーバーグループ）
+          switch: 0x16a34a,        // 緑
+          spine: 0x16a34a,         // 緑（スパインスイッチ）
+          server_leaf: 0x16a34a,   // 緑（サーバーリーフスイッチ）
+          oob_leaf: 0x16a34a,     // 緑（OOBリーフスイッチ）
+          router: 0xdc2626,        // 赤
+          firewall: 0xea580c,      // オレンジ
+          storage: 0x9333ea,       // 紫
+          pdu: 0x22c55e,           // 緑（PDU）
         };
         const equipmentColor = equipmentColors[eq.type] || 0x6b7280; // デフォルト: グレー
 
@@ -340,7 +355,14 @@ export function SiteEquipment3DViewer({
           {siteEquipment?.label || '棟内機器構成'}
         </div>
         <div style={{ color: '#666' }}>
-          ラック数: {racks.length} | 総機器数: {racks.reduce((sum: number, rack: any) => sum + (rack.equipment?.length || 0), 0)}
+          ラック数: {racks.length} | 総機器数: {racks.reduce((sum: number, rack: any) => {
+            const equipment = (rack.devices && Array.isArray(rack.devices)) 
+              ? rack.devices 
+              : (rack.equipment && Array.isArray(rack.equipment)) 
+                ? rack.equipment 
+                : [];
+            return sum + equipment.length;
+          }, 0)}
         </div>
       </div>
     </div>

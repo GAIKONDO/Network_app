@@ -22,14 +22,21 @@ import pLimit from 'p-limit';
  */
 export async function saveTopicEmbedding(
   topicId: string,
-  meetingNoteId: string,
+  meetingNoteId: string | undefined,
   organizationId: string,
   title: string,
   content: string,
-  metadata?: Partial<Pick<TopicMetadata, 'keywords' | 'semanticCategory' | 'tags' | 'summary' | 'importance'>>
+  metadata?: Partial<Pick<TopicMetadata, 'keywords' | 'semanticCategory' | 'tags' | 'summary' | 'importance'>>,
+  regulationId?: string
 ): Promise<void> {
   if (typeof window === 'undefined') {
     throw new Error('トピック埋め込みの保存はクライアント側でのみ実行可能です');
+  }
+  
+  // meetingNoteIdまたはregulationIdのいずれかが必要
+  const parentId = meetingNoteId || regulationId;
+  if (!parentId) {
+    throw new Error('meetingNoteIdまたはregulationIdのいずれかが必要です');
   }
   
   // Graphvizのトピックの場合は、専用の関数を使用
@@ -86,19 +93,26 @@ export async function saveTopicEmbedding(
   try {
     const now = new Date().toISOString();
     const embeddingVersion = metadata ? '2.0' : '1.0';
-    const embeddingId = `${meetingNoteId}-topic-${topicId}`;
+    const embeddingId = `${parentId}-topic-${topicId}`;
     
     // topicsテーブルに保存するためのデータ
     const topicData: any = {
       id: embeddingId,
       topicId,
-      meetingNoteId,
       organizationId,
       title: title || '',
       content: content || null,
       createdAt: now,
       updatedAt: now,
     };
+    
+    // meetingNoteIdまたはregulationIdを設定
+    if (meetingNoteId) {
+      topicData.meetingNoteId = meetingNoteId;
+    }
+    if (regulationId) {
+      topicData.regulationId = regulationId;
+    }
 
     // メタデータフィールドを追加
     if (metadata?.semanticCategory) {
@@ -137,7 +151,7 @@ export async function saveTopicEmbedding(
     if (shouldUseChroma()) {
       try {
         const { saveTopicEmbeddingToChroma } = await import('./topicEmbeddingsChroma');
-        await saveTopicEmbeddingToChroma(topicId, meetingNoteId, organizationId, title, content, metadata);
+        await saveTopicEmbeddingToChroma(topicId, meetingNoteId, organizationId, title, content, metadata, regulationId);
         
         // topicsテーブルにメタデータを保存
         try {
@@ -234,11 +248,12 @@ export async function saveTopicEmbedding(
  */
 export async function saveTopicEmbeddingAsync(
   topicId: string,
-  meetingNoteId: string,
+  meetingNoteId: string | undefined,
   organizationId: string,
   title: string,
   content: string,
-  metadata?: Partial<Pick<TopicMetadata, 'keywords' | 'semanticCategory' | 'tags' | 'summary' | 'importance'>>
+  metadata?: Partial<Pick<TopicMetadata, 'keywords' | 'semanticCategory' | 'tags' | 'summary' | 'importance'>>,
+  regulationId?: string
 ): Promise<void> {
   if (typeof window === 'undefined') {
     return;
@@ -248,11 +263,12 @@ export async function saveTopicEmbeddingAsync(
     console.log('💾 [saveTopicEmbeddingAsync] 開始:', {
       topicId,
       meetingNoteId,
+      regulationId,
       organizationId,
       hasMetadata: !!metadata,
       metadataKeys: metadata ? Object.keys(metadata) : [],
     });
-    await saveTopicEmbedding(topicId, meetingNoteId, organizationId, title, content, metadata);
+    await saveTopicEmbedding(topicId, meetingNoteId, organizationId, title, content, metadata, regulationId);
     console.log('✅ [saveTopicEmbeddingAsync] 成功:', topicId);
   } catch (error: any) {
     console.error(`❌ [saveTopicEmbeddingAsync] トピック ${topicId} の埋め込み生成エラー:`, {
@@ -308,10 +324,16 @@ export async function getTopicEmbeddingsByIds(
  */
 export async function getTopicEmbedding(
   topicId: string,
-  meetingNoteId: string
+  meetingNoteId: string | undefined,
+  regulationId?: string
 ): Promise<TopicEmbedding | null> {
   try {
-    const embeddingId = `${meetingNoteId}-topic-${topicId}`;
+    const parentId = meetingNoteId || regulationId;
+    if (!parentId) {
+      console.warn('getTopicEmbedding: meetingNoteIdまたはregulationIdが必要です');
+      return null;
+    }
+    const embeddingId = `${parentId}-topic-${topicId}`;
     
     const result = await callTauriCommand('doc_get', {
       collectionName: 'topics',
@@ -336,16 +358,19 @@ export async function findSimilarTopics(
   queryText: string,
   limit: number = 5,
   meetingNoteId?: string,
-  organizationId?: string
-): Promise<Array<{ topicId: string; meetingNoteId: string; similarity: number; title?: string; contentSummary?: string }>> {
+  organizationId?: string,
+  regulationId?: string
+): Promise<Array<{ topicId: string; meetingNoteId?: string; regulationId?: string; similarity: number; title?: string; contentSummary?: string }>> {
   if (shouldUseChroma()) {
     try {
       const { findSimilarTopicsChroma } = await import('./topicEmbeddingsChroma');
       const results = await findSimilarTopicsChroma(queryText, limit, organizationId);
-      // meetingNoteIdでフィルタリング
+      // meetingNoteIdまたはregulationIdでフィルタリング
       let filteredResults = results;
       if (meetingNoteId) {
         filteredResults = results.filter(r => r.meetingNoteId === meetingNoteId);
+      } else if (regulationId) {
+        filteredResults = results.filter(r => r.regulationId === regulationId);
       }
       return filteredResults;
     } catch (chromaError: any) {
@@ -382,11 +407,12 @@ export async function findSimilarTopicsHybrid(
  */
 export async function findSimilarTopicsByTopicId(
   topicId: string,
-  meetingNoteId: string,
-  limit: number = 5
-): Promise<Array<{ topicId: string; meetingNoteId: string; similarity: number }>> {
+  meetingNoteId: string | undefined,
+  limit: number = 5,
+  regulationId?: string
+): Promise<Array<{ topicId: string; meetingNoteId?: string; regulationId?: string; similarity: number }>> {
   try {
-    const topicEmbedding = await getTopicEmbedding(topicId, meetingNoteId);
+    const topicEmbedding = await getTopicEmbedding(topicId, meetingNoteId, regulationId);
     
     if (!topicEmbedding || !topicEmbedding.combinedEmbedding) {
       return [];
@@ -394,12 +420,14 @@ export async function findSimilarTopicsByTopicId(
 
     const embeddingsSnapshot = await getDocs(collection(null, 'topics'));
 
-    const similarities: Array<{ topicId: string; meetingNoteId: string; similarity: number }> = [];
+    const similarities: Array<{ topicId: string; meetingNoteId?: string; regulationId?: string; similarity: number }> = [];
     
     for (const docSnap of embeddingsSnapshot.docs) {
       const embeddingData = docSnap.data() as TopicEmbedding;
       
-      if (embeddingData.topicId === topicId && embeddingData.meetingNoteId === meetingNoteId) {
+      const embeddingParentId = embeddingData.meetingNoteId || embeddingData.regulationId;
+      const currentParentId = meetingNoteId || regulationId;
+      if (embeddingData.topicId === topicId && embeddingParentId === currentParentId) {
         continue;
       }
 
@@ -415,6 +443,7 @@ export async function findSimilarTopicsByTopicId(
         similarities.push({
           topicId: embeddingData.topicId,
           meetingNoteId: embeddingData.meetingNoteId,
+          regulationId: embeddingData.regulationId,
           similarity,
         });
       } catch (error) {
@@ -436,11 +465,12 @@ export async function findSimilarTopicsByTopicId(
  */
 export async function batchUpdateTopicEmbeddings(
   topics: Array<{ id: string; title: string; content: string; metadata?: Partial<TopicMetadata> }>,
-  meetingNoteId: string,
+  meetingNoteId: string | undefined,
   organizationId: string,
   forceRegenerate: boolean = false,
   onProgress?: (current: number, total: number, topicId: string, status: 'processing' | 'skipped' | 'error' | 'success') => void,
-  shouldCancel?: () => boolean
+  shouldCancel?: () => boolean,
+  regulationId?: string
 ): Promise<{ success: number; skipped: number; errors: number }> {
   let successCount = 0;
   let skippedCount = 0;
@@ -456,7 +486,15 @@ export async function batchUpdateTopicEmbeddings(
       }
       
       try {
-        const topicEmbeddingId = `${meetingNoteId}-topic-${topic.id}`;
+        const parentId = meetingNoteId || regulationId;
+        if (!parentId) {
+          console.warn(`トピック ${topic.id} のparentIdが取得できません。スキップします。`);
+          const current = ++processedCount;
+          skippedCount++;
+          onProgress?.(current, topics.length, topic.id, 'skipped');
+          return { status: 'skipped' as const };
+        }
+        const topicEmbeddingId = `${parentId}-topic-${topic.id}`;
         
         if (!forceRegenerate) {
           try {
@@ -519,7 +557,8 @@ export async function batchUpdateTopicEmbeddings(
           organizationId,
           topic.title,
           topic.content,
-          topic.metadata
+          topic.metadata,
+          regulationId
         );
         
         const current = ++processedCount;

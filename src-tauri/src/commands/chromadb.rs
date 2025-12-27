@@ -89,10 +89,11 @@ pub async fn chromadb_find_similar_relations(
 #[tauri::command]
 pub async fn chromadb_save_topic_embedding(
     topicId: String,
-    meetingNoteId: String,
+    meetingNoteId: Option<String>,
     organizationId: String,
     combinedEmbedding: Vec<f32>,
     metadata: HashMap<String, Value>,
+    regulationId: Option<String>,
 ) -> Result<(), String> {
     chromadb::save_topic_embedding(
         topicId,
@@ -100,6 +101,7 @@ pub async fn chromadb_save_topic_embedding(
         organizationId,
         combinedEmbedding,
         metadata,
+        regulationId,
     ).await
 }
 

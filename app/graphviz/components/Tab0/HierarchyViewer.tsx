@@ -85,6 +85,14 @@ export function HierarchyViewer({
         }
       } else if (hierarchyState.currentLevel === 'sites' && siteEquipment) {
         // 棟内機器構成
+        console.log('🔄 [HierarchyViewer] 棟内機器構成のDOT生成開始', {
+          hasRacks: !!(siteEquipment.racks && Array.isArray(siteEquipment.racks)),
+          racksCount: siteEquipment.racks?.length || 0,
+          hasRack: !!((siteEquipment as any).rack && typeof (siteEquipment as any).rack === 'object'),
+          rackId: (siteEquipment as any).rack?.id,
+          initialRackId,
+          hasRackServers: !!rackServers,
+        });
         // initialRackIdが指定されている場合、そのラックのみを表示
         // ただし、rack-serversカードから来た場合は、racksレベルで表示する
         if (initialRackId && rackServers) {
@@ -96,6 +104,10 @@ export function HierarchyViewer({
           const result = generateSiteEquipmentDot(siteEquipment, rackServersMap, initialRackId || undefined);
           generatedDot = result.dotCode;
           generatedMap = result.nodeIdMap;
+          console.log('✅ [HierarchyViewer] 棟内機器構成のDOT生成完了', {
+            dotCodeLength: generatedDot.length,
+            nodeMapSize: generatedMap.size,
+          });
         }
       } else if (hierarchyState.currentLevel === 'racks' && rackServers) {
         // ラック内サーバー
@@ -140,10 +152,31 @@ export function HierarchyViewer({
                         
                         try {
                           const siteParsed = yaml.load(siteFile.yamlContent) as any;
+                          let rack: any = null;
+                          
+                          // 従来のフォーマット: racks配列
                           if (siteParsed?.racks && Array.isArray(siteParsed.racks)) {
-                            const rack = siteParsed.racks.find((r: any) => r.id === rackId);
-                            if (rack && rack.equipment && Array.isArray(rack.equipment)) {
-                              const servers = rack.equipment
+                            rack = siteParsed.racks.find((r: any) => r.id === rackId);
+                          }
+                          // 新しいフォーマット: rack（単数）オブジェクト
+                          else if (siteParsed?.rack && typeof siteParsed.rack === 'object' && siteParsed.rack.id === rackId) {
+                            rack = siteParsed.rack;
+                          }
+                          
+                          if (rack) {
+                            // 従来のフォーマット: equipment配列
+                            const equipment = rack.equipment && Array.isArray(rack.equipment) 
+                              ? rack.equipment 
+                              : [];
+                            // 新しいフォーマット: devices配列
+                            const devices = rack.devices && Array.isArray(rack.devices) 
+                              ? rack.devices 
+                              : [];
+                            
+                            const allDevices = equipment.length > 0 ? equipment : devices;
+                            
+                            if (allDevices.length > 0) {
+                              const servers = allDevices
                                 .filter((eq: any) => eq.type === 'server')
                                 .map((eq: any) => ({
                                   id: eq.id,

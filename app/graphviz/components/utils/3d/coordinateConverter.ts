@@ -87,19 +87,38 @@ export function unitTo3DHeight(
  * @returns 3D位置、または null（U位置が無効な場合）
  */
 export function equipmentTo3DPosition(
-  equipment: Equipment,
+  equipment: Equipment | any, // any型を追加して新しいフォーマットに対応
   rackCapacity: number = 42
 ): Device3DPosition | null {
-  if (!equipment.position?.unit) {
-    return null;
+  // 新しいフォーマット対応: position_u配列形式（例: [30, 41]）
+  if (equipment.position_u && Array.isArray(equipment.position_u) && equipment.position_u.length >= 2) {
+    const [uStart, uEnd] = equipment.position_u;
+    if (typeof uStart === 'number' && typeof uEnd === 'number' && uStart >= 1 && uEnd >= uStart) {
+      return unitTo3DHeight(uStart, uEnd - uStart + 1, rackCapacity);
+    }
+  }
+  
+  // 従来のフォーマット: position.unit文字列形式（例: "1-4"）または数値形式（例: 25）
+  if (equipment.position?.unit !== undefined && equipment.position?.unit !== null) {
+    // 数値の場合は文字列に変換して処理
+    const unitValue = equipment.position.unit;
+    if (typeof unitValue === 'number') {
+      // 数値の場合は1Uとして処理
+      if (unitValue >= 1) {
+        return unitTo3DHeight(unitValue, 1, rackCapacity);
+      }
+      return null;
+    } else if (typeof unitValue === 'string') {
+      // 文字列の場合は従来通りパース
+      const uPosition = parseUnitPosition(unitValue);
+      if (!uPosition) {
+        return null;
+      }
+      return unitTo3DHeight(uPosition.uStart, uPosition.uHeight, rackCapacity);
+    }
   }
 
-  const uPosition = parseUnitPosition(equipment.position.unit);
-  if (!uPosition) {
-    return null;
-  }
-
-  return unitTo3DHeight(uPosition.uStart, uPosition.uHeight, rackCapacity);
+  return null;
 }
 
 /**

@@ -445,6 +445,10 @@ export function registerStandardTools(): void {
   const { formatMeetingNoteContentTool } = require('./meetingNoteFormattingTool');
   registerTool(formatMeetingNoteContentTool);
   
+  // 制度整形Toolを登録
+  const { formatRegulationContentTool } = require('./regulationFormattingTool');
+  registerTool(formatRegulationContentTool);
+  
   // 組織作成Toolを登録
   const { getOrganizationTreeTool, createOrganizationTool } = require('./organizationTools');
   registerTool(getOrganizationTreeTool);

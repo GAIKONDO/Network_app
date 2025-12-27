@@ -46,8 +46,10 @@ import { useEntityRelationManagement } from './hooks/useEntityRelationManagement
 function MeetingNoteDetailPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const organizationId = searchParams?.get('id') as string;
+  // organizationIdは'id'または'organizationId'パラメータから取得（後方互換性のため）
+  const organizationId = (searchParams?.get('organizationId') || searchParams?.get('id')) as string;
   const meetingId = searchParams?.get('meetingId') as string;
+  const topicIdFromUrl = searchParams?.get('topicId') as string | null;
   
   const [activeTab, setActiveTab] = useState<TabType>('april');
   const [activeSection, setActiveSection] = useState<string>('summary');
@@ -352,6 +354,56 @@ function MeetingNoteDetailPageContent() {
       }
     }
   }, [activeTab, monthContents, activeSection, setActiveSection]);
+
+  // topicIdパラメータから該当するトピックを見つけて表示
+  useEffect(() => {
+    if (!topicIdFromUrl || !monthContents || Object.keys(monthContents).length === 0) {
+      return;
+    }
+
+    // すべてのタブとアイテムを検索して、該当するトピックを見つける
+    for (const [tabKey, tabData] of Object.entries(monthContents)) {
+      if (!tabData || !tabData.items) continue;
+      
+      for (const item of tabData.items) {
+        if (!item.topics) continue;
+        
+        const foundTopic = item.topics.find(topic => topic.id === topicIdFromUrl);
+        if (foundTopic) {
+          // 該当するタブに切り替え
+          setActiveTab(tabKey as TabType);
+          // 該当するアイテムのセクションに設定
+          setActiveSection(item.id);
+          // ナビゲーションで展開
+          setExpandedNavItems(prev => new Set([...prev, item.id]));
+          // トピックを展開
+          setExpandedTopics(prev => new Set([...prev, foundTopic.id]));
+          
+          // 少し遅延してからスクロール（DOMの更新を待つ）
+          setTimeout(() => {
+            const topicElementId = `${item.id}-topic-${foundTopic.id}`;
+            const topicElement = document.getElementById(topicElementId);
+            if (topicElement) {
+              topicElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              // ハイライト表示
+              topicElement.style.backgroundColor = '#fff9e6';
+              setTimeout(() => {
+                topicElement.style.backgroundColor = '';
+              }, 2000);
+            }
+          }, 300);
+          
+          // URLからtopicIdパラメータを削除（一度だけ実行）
+          const newParams = new URLSearchParams(searchParams?.toString() || '');
+          newParams.delete('topicId');
+          const newUrl = newParams.toString() ? `?${newParams.toString()}` : '';
+          router.replace(`/organization/meeting${newUrl}`, { scroll: false });
+          
+          return;
+        }
+      }
+    }
+  }, [topicIdFromUrl, monthContents, setActiveTab, setActiveSection, setExpandedNavItems, setExpandedTopics, searchParams, router]);
 
   // JSONダウンロード（カスタムフックのものを使用、downloadingJson状態を追加）
   const handleDownloadJson = useCallback(async () => {

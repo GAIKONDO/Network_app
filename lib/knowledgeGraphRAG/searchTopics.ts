@@ -33,6 +33,7 @@ export async function searchTopics(
       console.log('[searchTopics] ChromaDB検索結果のサンプル:', chromaResults.slice(0, 2).map(r => ({
         topicId: r.topicId,
         meetingNoteId: r.meetingNoteId,
+        regulationId: r.regulationId,
         title: r.title,
         similarity: r.similarity,
       })));
@@ -43,23 +44,28 @@ export async function searchTopics(
       return [];
     }
 
-    // トピックIDとmeetingNoteIdのペアを抽出
-    const topicIdsWithMeetingNoteIds = chromaResults.map(r => ({
+    // トピックIDとmeetingNoteId/regulationIdのペアを抽出
+    const topicIdsWithParentIds = chromaResults.map(r => ({
       topicId: r.topicId,
       meetingNoteId: r.meetingNoteId,
+      regulationId: r.regulationId,
     }));
 
     // バッチでトピックの詳細情報を取得（N+1問題を回避）
-    const topics = await getTopicsByIds(topicIdsWithMeetingNoteIds);
+    const topics = await getTopicsByIds(topicIdsWithParentIds);
 
-    // トピックIDとmeetingNoteIdの複合キーでマップを作成
-    const topicMap = new Map(topics.map(t => [`${t.topicId}-${t.meetingNoteId}`, t]));
+    // トピックIDとparentIdの複合キーでマップを作成
+    const topicMap = new Map(topics.map(t => {
+      const parentId = t.meetingNoteId || t.regulationId || '';
+      return [`${t.topicId}-${parentId}`, t];
+    }));
 
     // トピックファイル情報を一括取得
-    // topicFilesテーブルのtopicIdは{meetingNoteId}-topic-{topicId}形式
-    const topicIdsForFiles = topicIdsWithMeetingNoteIds.map(({ topicId, meetingNoteId }) => 
-      `${meetingNoteId}-topic-${topicId}`
-    );
+    // topicFilesテーブルのtopicIdは{meetingNoteId}-topic-{topicId}または{regulationId}-topic-{topicId}形式
+    const topicIdsForFiles = topicIdsWithParentIds.map(({ topicId, meetingNoteId, regulationId }) => {
+      const parentId = meetingNoteId || regulationId || '';
+      return `${parentId}-topic-${topicId}`;
+    });
     const topicFiles = await getTopicFilesByTopicIds(topicIdsForFiles);
     
     // トピックIDをキーにしたファイルマップを作成
@@ -101,17 +107,21 @@ export async function searchTopics(
     // 結果を構築
     const results: KnowledgeGraphSearchResult[] = [];
 
-    for (const { topicId, meetingNoteId, similarity, title, contentSummary, organizationId: chromaOrgId } of chromaResults) {
-      let topic = topicMap.get(`${topicId}-${meetingNoteId}`);
+    for (const { topicId, meetingNoteId, regulationId, similarity, title, contentSummary, organizationId: chromaOrgId } of chromaResults) {
+      const parentId = meetingNoteId || regulationId || '';
+      let topic = topicMap.get(`${topicId}-${parentId}`);
       
       // トピックが見つからない場合、ChromaDBから取得した情報を直接使用
       if (!topic) {
-        console.warn(`[searchTopics] トピックID ${topicId} (会議メモID: ${meetingNoteId}) の詳細情報が見つかりませんでした。ChromaDBの情報を使用します。`);
+        const parentType = meetingNoteId ? '会議メモ' : '制度';
+        const parentIdStr = meetingNoteId || regulationId || '不明';
+        console.warn(`[searchTopics] トピックID ${topicId} (${parentType}ID: ${parentIdStr}) の詳細情報が見つかりませんでした。ChromaDBの情報を使用します。`);
         
         // ChromaDBから取得した情報から最小限のTopicSearchInfoを作成
         topic = {
           topicId: topicId,
           meetingNoteId: meetingNoteId,
+          regulationId: regulationId,
           title: title || 'タイトル不明',
           content: contentSummary || '',
           summary: contentSummary,
@@ -205,10 +215,12 @@ export async function searchTopics(
       });
 
       // このトピックに紐づくファイル情報を取得
-      const topicIdForFiles = `${meetingNoteId}-topic-${topicId}`;
+      const topicIdForFiles = `${parentId}-topic-${topicId}`;
       const files = filesMap.get(topicIdForFiles) || [];
       
-      console.log(`[searchTopics] トピック ${topicId} (meetingNoteId: ${meetingNoteId}) のファイル情報:`, {
+      const parentType = meetingNoteId ? 'meetingNoteId' : 'regulationId';
+      const parentIdStr = meetingNoteId || regulationId || '不明';
+      console.log(`[searchTopics] トピック ${topicId} (${parentType}: ${parentIdStr}) のファイル情報:`, {
         topicIdForFiles,
         filesCount: files.length,
         filesMapHasKey: filesMap.has(topicIdForFiles),
@@ -229,6 +241,7 @@ export async function searchTopics(
           semanticCategory: topic.semanticCategory,
           keywords: topic.keywords,
           meetingNoteId: topic.meetingNoteId,
+          regulationId: topic.regulationId,
           organizationId: topic.organizationId,
           files: files.length > 0 ? files.map(f => ({
             id: f.id,

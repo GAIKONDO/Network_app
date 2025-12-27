@@ -32,6 +32,18 @@ interface DotEditorProps {
 export function DotEditor({ value }: DotEditorProps) {
   const editorRef = useRef<any>(null);
 
+  const handleDownload = () => {
+    const blob = new Blob([value], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `graphviz-${new Date().getTime()}.dot`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -41,11 +53,56 @@ export function DotEditor({ value }: DotEditorProps) {
     }}>
       <div style={{
         marginBottom: '8px',
-        fontSize: '14px',
-        fontWeight: 500,
-        color: '#1a1a1a',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
       }}>
-        Graphviz DOTコード
+        <div style={{
+          fontSize: '14px',
+          fontWeight: 500,
+          color: '#1a1a1a',
+        }}>
+          Graphviz DOTコード
+        </div>
+        <button
+          onClick={handleDownload}
+          disabled={!value}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px 8px',
+            fontSize: '12px',
+            backgroundColor: value ? '#4262FF' : '#E5E7EB',
+            color: value ? '#fff' : '#9CA3AF',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: value ? 'pointer' : 'not-allowed',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            if (value) {
+              e.currentTarget.style.backgroundColor = '#2D4CD0';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (value) {
+              e.currentTarget.style.backgroundColor = '#4262FF';
+            }
+          }}
+          title="DOTコードをダウンロード"
+        >
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M10 2.5V12.5M10 12.5L6.25 8.75M10 12.5L13.75 8.75M3.75 15.625H16.25"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          ダウンロード
+        </button>
       </div>
       <div style={{
         flex: 1,
