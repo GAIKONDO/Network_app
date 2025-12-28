@@ -4,6 +4,9 @@ import type { Message, ModelType } from '../types';
 import type { Agent } from '@/lib/agent-system/types';
 import { useRAGContext } from './useRAGContext';
 import { useAIChat } from './useAIChat';
+import { createStreamingOptions } from '@/lib/localModel/chatHelper';
+import { isLocalModel } from '@/lib/localModel/router';
+import { removeThinkingProcess } from '@/lib/localModel/responseCleaner';
 
 export function useAIAssistant(
   modelType: ModelType,
@@ -28,6 +31,8 @@ export function useAIAssistant(
   const pathname = usePathname();
   const params = useParams();
   const previousAgentRef = useRef<Agent | null>(null);
+  const isStreamingRef = useRef<boolean>(false); // ストリーミング中かどうかのフラグ
+  const lastScrollTimeRef = useRef<number>(0); // 最後にスクロールした時刻
 
   const { getRAGContext } = useRAGContext();
   const { sendMessage: sendAIMessage } = useAIChat(modelType, selectedModel);
@@ -102,9 +107,27 @@ export function useAIAssistant(
     }
   }, [selectedAgent]);
 
-  // メッセージが追加されたら自動スクロール
+  // メッセージが追加されたら自動スクロール（ストリーミング中は制御）
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // ストリーミング中は、スクロールを抑制（頻繁なスクロールを防ぐ）
+    if (isStreamingRef.current) {
+      // ストリーミング中は、最後のスクロールから一定時間（100ms）経過した場合のみスクロール
+      const now = Date.now();
+      if (now - lastScrollTimeRef.current > 100) {
+        // スクロール位置が既に最下部に近い場合のみスクロール
+        const container = messagesEndRef.current?.parentElement;
+        if (container) {
+          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+          if (isNearBottom) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            lastScrollTimeRef.current = now;
+          }
+        }
+      }
+    } else {
+      // ストリーミング中でない場合は通常通りスクロール
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   // メッセージをコピー
@@ -780,6 +803,73 @@ export function useAIAssistant(
       // 最新のメッセージ履歴を取得（ユーザーメッセージを含むが、ローディングメッセージは除外）
       const currentMessages = [...messages, userMessage];
       
+      // ローカルモデルの場合はストリーミングを使用
+      const useStreaming = isLocalModel(selectedModel);
+      let accumulatedText = '';
+      let isInThinkingProcess = false; // 思考プロセス内かどうかのフラグ
+
+      // ストリーミングオプションを作成
+      const streamingOptions = useStreaming ? createStreamingOptions(
+        (chunk: string) => {
+          // 思考プロセスの開始タグを検出
+          if (chunk.includes('<redacted_reasoning') || chunk.includes('<think') || chunk.includes('<reasoning')) {
+            isInThinkingProcess = true;
+            // 開始タグより前の部分だけを処理
+            const beforeTag = chunk.split(/<redacted_reasoning|<think|<reasoning/i)[0];
+            if (beforeTag) {
+              accumulatedText += beforeTag;
+            }
+            return; // 思考プロセスのチャンクはスキップ
+          }
+          
+          // 思考プロセスの終了タグを検出
+          if (isInThinkingProcess) {
+            if (chunk.includes('</think>') || chunk.includes('</think>') || chunk.includes('</reasoning>')) {
+              isInThinkingProcess = false;
+              // 終了タグより後の部分だけを処理
+              const afterTag = chunk.split(/<\/redacted_reasoning>|<\/think>|<\/reasoning>/i).slice(1).join('');
+              if (afterTag) {
+                accumulatedText += afterTag;
+              }
+            }
+            // 思考プロセス内の場合はスキップ
+            return;
+          }
+          
+          // 通常のチャンクを処理
+          accumulatedText += chunk;
+          
+          // 蓄積されたテキストから思考プロセスを除去（念のため）
+          const cleanedText = removeThinkingProcess(accumulatedText);
+          
+          const assistantMessage: Message = {
+            id: loadingMessageId,
+            role: 'assistant',
+            content: cleanedText,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => prev.map(msg => msg.id === loadingMessageId ? assistantMessage : msg));
+        },
+        {
+          onStart: () => {
+            // ストリーミング開始時は「考え中...」を表示
+            accumulatedText = '';
+            isStreamingRef.current = true; // ストリーミング開始をマーク
+          },
+          onEnd: () => {
+            // ストリーミング終了時
+            isStreamingRef.current = false; // ストリーミング終了をマーク
+            // 最終的なスクロールを実行
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          },
+          onError: (error: Error) => {
+            console.error('ストリーミングエラー:', error);
+          },
+        }
+      ) : undefined;
+      
       // AIにメッセージを送信
       const responseText = await sendAIMessage(
         inputText,
@@ -792,17 +882,32 @@ export function useAIAssistant(
         itemId,
         regulationId,
         regulationItemId,
-        ragResults // RAG検索結果（ファイル情報を含む）
+        ragResults, // RAG検索結果（ファイル情報を含む）
+        streamingOptions // ストリーミングオプション
       );
 
-      // ローディングメッセージを実際のレスポンスに置き換え
-      const assistantMessage: Message = {
-        id: loadingMessageId,
-        role: 'assistant',
-        content: responseText || 'レスポンスが空でした。',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => prev.map(msg => msg.id === loadingMessageId ? assistantMessage : msg));
+      // ストリーミングを使用していない場合のみ、メッセージを更新
+      if (!useStreaming) {
+        const assistantMessage: Message = {
+          id: loadingMessageId,
+          role: 'assistant',
+          content: responseText || 'レスポンスが空でした。',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => prev.map(msg => msg.id === loadingMessageId ? assistantMessage : msg));
+      } else {
+        // ストリーミングの場合、最終的なテキストをクリーニングして設定（念のため）
+        const finalText = removeThinkingProcess(responseText || accumulatedText);
+        if (finalText) {
+          const assistantMessage: Message = {
+            id: loadingMessageId,
+            role: 'assistant',
+            content: finalText,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => prev.map(msg => msg.id === loadingMessageId ? assistantMessage : msg));
+        }
+      }
     } catch (error: any) {
       console.error('AIアシスタントエラー:', error);
       const errorMessage: Message = {

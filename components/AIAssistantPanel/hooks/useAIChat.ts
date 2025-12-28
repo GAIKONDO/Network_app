@@ -1,9 +1,20 @@
 import type { Message, ModelType, RAGSource } from '../types';
 import { MODEL_PRICES } from '../constants';
+import { parseToolCalls, executeToolCalls, formatToolCallResults } from '@/lib/mcp/toolParser';
+import { getProviderForModel, getModelConfig, isLocalModel } from '@/lib/localModel/router';
+import { chatWithProvider, createStreamingOptions } from '@/lib/localModel/chatHelper';
+import type { StreamingOptions } from '@/lib/localModel/types';
+import { cleanResponse } from '@/lib/localModel/responseCleaner';
 
 const SYSTEM_PROMPT_TEMPLATE = `あなたは事業計画策定を支援するAIアシスタントです。
 ユーザーの質問に対して、親切で分かりやすい回答を提供してください。
 必要に応じて、事業計画の作成や改善に関するアドバイスを提供できます。
+
+**重要な注意事項：**
+- 思考プロセスや内部的な推論を出力しないでください
+- <think>, <thinking>, <think>などのタグは使用しないでください
+- ユーザーに見せる必要のない内部的な思考は出力しないでください
+- 回答は直接的に、明確に提供してください
 
 {ragContext}
 
@@ -79,7 +90,8 @@ export function useAIChat(modelType: ModelType, selectedModel: string) {
     itemId?: string | null,
     regulationId?: string | null,
     regulationItemId?: string | null,
-    ragResults?: any[] // RAG検索結果（ファイル情報を含む）
+    ragResults?: any[], // RAG検索結果（ファイル情報を含む）
+    streamingOptions?: StreamingOptions // ストリーミングオプション（オプション）
   ): Promise<string> => {
     const aiStartTime = Date.now();
 
@@ -236,35 +248,50 @@ ${selectedAgent.systemPrompt ? `\n**Agentシステムプロンプト:**\n${selec
       ...conversationMessages,
     ];
 
-    const isLocalModel = selectedModel.startsWith('qwen') || 
-                         selectedModel.startsWith('llama') || 
-                         selectedModel.startsWith('mistral') ||
-                         selectedModel.includes(':latest') ||
-                         selectedModel.includes(':instruct');
+    const isLocal = isLocalModel(selectedModel);
     const isGeminiModel = selectedModel.startsWith('gemini');
     const isClaudeModel = selectedModel.startsWith('claude');
 
     let responseText = '';
     let tokenUsage: any = null;
 
-    if (isLocalModel) {
-      responseText = await callOllamaAPI(selectedModel, allMessages);
+    if (isLocal) {
+      // 新しいProvider抽象を使用（ストリーミング対応）
+      const modelConfig = getModelConfig(selectedModel);
+      const provider = getProviderForModel(modelConfig);
+      
+      const result = await chatWithProvider(
+        provider,
+        allMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        {
+          model: selectedModel,
+          temperature: 0.7,
+          maxTokens: 2000,
+        },
+        streamingOptions // ストリーミングオプションを渡す
+      );
+      
+      // 思考プロセスを除去
+      responseText = cleanResponse(result.text);
+      // tokenUsageは現時点では未対応（将来的に拡張可能）
     } else if (isGeminiModel) {
       const result = await callGeminiAPI(selectedModel, allMessages);
-      responseText = result.text;
+      responseText = cleanResponse(result.text);
       tokenUsage = result.usage;
     } else if (isClaudeModel) {
       const result = await callClaudeAPI(selectedModel, allMessages);
-      responseText = result.text;
+      responseText = cleanResponse(result.text);
       tokenUsage = result.usage;
     } else {
       const result = await callOpenAIAPI(selectedModel, allMessages);
-      responseText = result.text;
+      responseText = cleanResponse(result.text);
       tokenUsage = result.usage;
     }
 
     // Tool呼び出しを検出して実行
-    const { parseToolCalls, executeToolCalls, formatToolCallResults } = await import('@/lib/mcp/toolParser');
     const toolCalls = parseToolCalls(responseText);
     
     if (toolCalls.length > 0) {
@@ -356,12 +383,26 @@ ${selectedAgent.systemPrompt ? `\n**Agentシステムプロンプト:**\n${selec
               },
             ];
             
-            if (isLocalModel) {
-              const followUpResponse = await callOllamaAPI(selectedModel, followUpMessages);
-              responseText = followUpResponse;
+            if (isLocal) {
+              const modelConfig = getModelConfig(selectedModel);
+              const provider = getProviderForModel(modelConfig);
+              const followUpResult = await chatWithProvider(
+                provider,
+                followUpMessages.map(msg => ({
+                  role: msg.role,
+                  content: msg.content,
+                })),
+                {
+                  model: selectedModel,
+                  temperature: 0.7,
+                  maxTokens: 2000,
+                },
+                streamingOptions // ストリーミングオプションを渡す（再問い合わせでもストリーミング可能）
+              );
+              responseText = cleanResponse(followUpResult.text);
             } else {
               const followUpResult = await callOpenAIAPI(selectedModel, followUpMessages);
-              responseText = followUpResult.text;
+              responseText = cleanResponse(followUpResult.text);
               tokenUsage = followUpResult.usage;
             }
             
@@ -439,12 +480,26 @@ ${selectedAgent.systemPrompt ? `\n**Agentシステムプロンプト:**\n${selec
               },
             ];
             
-            if (isLocalModel) {
-              const followUpResponse = await callOllamaAPI(selectedModel, followUpMessages);
-              responseText = followUpResponse;
+            if (isLocal) {
+              const modelConfig = getModelConfig(selectedModel);
+              const provider = getProviderForModel(modelConfig);
+              const followUpResult = await chatWithProvider(
+                provider,
+                followUpMessages.map(msg => ({
+                  role: msg.role,
+                  content: msg.content,
+                })),
+                {
+                  model: selectedModel,
+                  temperature: 0.7,
+                  maxTokens: 2000,
+                },
+                streamingOptions // ストリーミングオプションを渡す（再問い合わせでもストリーミング可能）
+              );
+              responseText = cleanResponse(followUpResult.text);
             } else {
               const followUpResult = await callOpenAIAPI(selectedModel, followUpMessages);
-              responseText = followUpResult.text;
+              responseText = cleanResponse(followUpResult.text);
               tokenUsage = followUpResult.usage;
             }
             
@@ -472,7 +527,7 @@ ${selectedAgent.systemPrompt ? `\n**Agentシステムプロンプト:**\n${selec
     await logMetrics(
       inputText,
       selectedModel,
-      isLocalModel,
+      isLocal,
       allMessages,
       responseText,
       aiStartTime,
