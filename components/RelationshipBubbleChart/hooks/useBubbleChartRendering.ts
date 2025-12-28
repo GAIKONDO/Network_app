@@ -93,6 +93,20 @@ export function useBubbleChartRendering({
         circle.setAttribute('stroke', color);
         circle.setAttribute('stroke-width', isHovered ? '1.5' : '1');
         circle.setAttribute('stroke-dasharray', '8,4');
+      } else if (nodeType === 'category') {
+        // カテゴリーノード
+        circle.setAttribute('fill', color);
+        circle.setAttribute('fill-opacity', isHovered ? '0.15' : '0.08');
+        circle.setAttribute('stroke', color);
+        circle.setAttribute('stroke-width', isHovered ? '1.5' : '1');
+        circle.setAttribute('stroke-dasharray', '8,4');
+      } else if (nodeType === 'startup') {
+        // スタートアップノード
+        circle.setAttribute('fill', color);
+        circle.setAttribute('fill-opacity', isHovered ? '0.8' : '0.7');
+        circle.setAttribute('stroke', '#ffffff');
+        circle.setAttribute('stroke-width', '1.5');
+        circle.setAttribute('filter', 'url(#bubble-shadow)');
       } else if (nodeType === 'organization' || nodeType === 'company') {
         // 組織/事業会社ノード
         circle.setAttribute('fill', color);
@@ -130,6 +144,16 @@ export function useBubbleChartRendering({
         // ノードタイプに応じた追加情報を表示
         if (nodeType === 'theme') {
           tooltipContent = `テーマ: ${nodeData.name}`;
+        } else if (nodeType === 'category') {
+          tooltipContent = `カテゴリー: ${nodeData.name}`;
+          if (nodeInfo?.data?.description) {
+            tooltipContent += `\n${nodeInfo.data.description.substring(0, 100)}${nodeInfo.data.description.length > 100 ? '...' : ''}`;
+          }
+        } else if (nodeType === 'startup') {
+          tooltipContent = `スタートアップ: ${nodeData.name}`;
+          if (nodeInfo?.data?.description) {
+            tooltipContent += `\n${nodeInfo.data.description.substring(0, 100)}${nodeInfo.data.description.length > 100 ? '...' : ''}`;
+          }
         } else if (nodeType === 'organization') {
           tooltipContent = `組織: ${nodeData.name}`;
         } else if (nodeType === 'company') {
@@ -228,60 +252,97 @@ export function useBubbleChartRendering({
 
       // ラベルを追加
       const name = nodeData.name || '';
-      const minRadiusForLabel = nodeType === 'theme' ? 50 : (nodeType === 'organization' || nodeType === 'company') ? 30 : nodeType === 'initiative' ? 20 : 12;
+      const minRadiusForLabel = nodeType === 'theme' || nodeType === 'category' ? 50 : (nodeType === 'organization' || nodeType === 'company') ? 30 : nodeType === 'initiative' || nodeType === 'startup' ? 20 : 12;
       
       if (node.r > minRadiusForLabel && name) {
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', String(node.x + offsetX));
-        text.setAttribute('y', String(node.y + offsetY));
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('dominant-baseline', 'middle');
+        // テキストの背景（白いアウトライン）を作成
+        const createTextWithBackground = (x: number, y: number, textContent: string, fontSize: number, fontWeight: string, fillColor: string) => {
+          const textGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          
+          // 背景用のテキスト（白いアウトライン）
+          const backgroundText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          backgroundText.setAttribute('x', String(x));
+          backgroundText.setAttribute('y', String(y));
+          backgroundText.setAttribute('text-anchor', 'middle');
+          backgroundText.setAttribute('dominant-baseline', 'middle');
+          backgroundText.setAttribute('font-size', fontSize + 'px');
+          backgroundText.setAttribute('font-weight', fontWeight);
+          backgroundText.setAttribute('fill', '#ffffff');
+          backgroundText.setAttribute('stroke', '#ffffff');
+          backgroundText.setAttribute('stroke-width', String(fontSize * 0.15));
+          backgroundText.setAttribute('stroke-linejoin', 'round');
+          backgroundText.setAttribute('stroke-linecap', 'round');
+          backgroundText.style.pointerEvents = 'none';
+          backgroundText.style.fontFamily = "'Inter', 'Noto Sans JP', -apple-system, sans-serif";
+          backgroundText.textContent = textContent;
+          
+          // 前景用のテキスト（実際の色）
+          const foregroundText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          foregroundText.setAttribute('x', String(x));
+          foregroundText.setAttribute('y', String(y));
+          foregroundText.setAttribute('text-anchor', 'middle');
+          foregroundText.setAttribute('dominant-baseline', 'middle');
+          foregroundText.setAttribute('font-size', fontSize + 'px');
+          foregroundText.setAttribute('font-weight', fontWeight);
+          foregroundText.setAttribute('fill', fillColor);
+          foregroundText.style.pointerEvents = 'none';
+          foregroundText.style.fontFamily = "'Inter', 'Noto Sans JP', -apple-system, sans-serif";
+          foregroundText.textContent = textContent;
+          
+          textGroup.appendChild(backgroundText);
+          textGroup.appendChild(foregroundText);
+          
+          return textGroup;
+        };
         
         let fontSize: number;
         let fontWeight: string;
         let fillColor: string;
+        let labelY: number;
         
-        if (nodeType === 'theme') {
-          fontSize = 20;
+        if (nodeType === 'theme' || nodeType === 'category') {
+          fontSize = 22;
           fontWeight = '700';
           fillColor = color;
-          // テーマはバブルの上に配置
-          text.setAttribute('y', String(node.y + offsetY - node.r - 20));
+          // テーマ/カテゴリーはバブルの上に配置
+          labelY = node.y + offsetY - node.r - 25;
         } else if (nodeType === 'organization' || nodeType === 'company') {
-          fontSize = 16;
+          fontSize = 18;
           fontWeight = '600';
           fillColor = color;
           // 組織/事業会社はバブルの上に配置（外側）
-          text.setAttribute('y', String(node.y + offsetY - node.r - 15));
-        } else if (nodeType === 'initiative') {
-          fontSize = 14;
+          labelY = node.y + offsetY - node.r - 18;
+        } else if (nodeType === 'initiative' || nodeType === 'startup') {
+          fontSize = 16;
           fontWeight = '600';
           fillColor = '#ffffff';
-          // 注力施策はバブルの内側上部に少しかかる位置に配置
-          text.setAttribute('y', String(node.y + offsetY - node.r * 0.7));
+          // 注力施策/スタートアップはバブルの内側中央に配置
+          labelY = node.y + offsetY;
         } else {
-          fontSize = 12;
-          fontWeight = '500';
+          fontSize = 13;
+          fontWeight = '600';
           fillColor = '#ffffff';
-          text.setAttribute('stroke', 'rgba(0,0,0,0.3)');
-          text.setAttribute('stroke-width', '0.5');
+          labelY = node.y + offsetY;
         }
         
-        text.setAttribute('font-size', fontSize + 'px');
-        text.setAttribute('font-weight', fontWeight);
-        text.setAttribute('fill', fillColor);
-        text.style.pointerEvents = 'none';
-        text.style.fontFamily = "'Inter', 'Noto Sans JP', -apple-system, sans-serif";
-        
-        // テキストを適切に表示（長い場合は省略）
-        const maxChars = Math.floor(node.r / (fontSize * 0.6));
+        // テキストの長さを調整
+        const maxChars = Math.floor(node.r / (fontSize * 0.5));
+        let displayText = name;
         if (name.length > maxChars) {
-          text.textContent = name.substring(0, maxChars - 1) + '...';
-        } else {
-          text.textContent = name;
+          displayText = name.substring(0, maxChars - 1) + '...';
         }
         
-        svg.appendChild(text);
+        // テキストを背景付きで作成
+        const textGroup = createTextWithBackground(
+          node.x + offsetX,
+          labelY,
+          displayText,
+          fontSize,
+          fontWeight,
+          fillColor
+        );
+        
+        svg.appendChild(textGroup);
       }
     });
   }, [packedData, hoveredNodeId, showTopics, width, height, onNodeClick, setHoveredNodeId, setTooltip, setSelectedTopic, setSelectedInitiative, svgRef, containerRef]);

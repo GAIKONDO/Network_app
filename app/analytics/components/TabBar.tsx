@@ -5,15 +5,15 @@
 'use client';
 
 interface AnalyticsTabBarProps {
-  activeTab: 'relationship-diagram' | 'a2c100' | 'tab3' | 'tab4';
-  onTabChange: (tab: 'relationship-diagram' | 'a2c100' | 'tab3' | 'tab4') => void;
+  activeTab: 'relationship-diagram' | 'a2c100' | 'category-management' | 'tab4';
+  onTabChange: (tab: 'relationship-diagram' | 'a2c100' | 'category-management' | 'tab4') => void;
 }
 
 export function AnalyticsTabBar({ activeTab, onTabChange }: AnalyticsTabBarProps) {
   const tabs = [
     { id: 'relationship-diagram' as const, label: '関係性図' },
     { id: 'a2c100' as const, label: 'A to C 100' },
-    { id: 'tab3' as const, label: '機能3（準備中）' },
+    { id: 'category-management' as const, label: 'カテゴリー管理' },
     { id: 'tab4' as const, label: '機能4（準備中）' },
   ];
 

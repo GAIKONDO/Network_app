@@ -7,8 +7,13 @@ export function useHierarchyData(
   showTopics: boolean
 ) {
   return useMemo(() => {
-    // テーマノードを取得
+    // テーマノードまたはカテゴリーノードを取得
     const themeNodes = nodes.filter(node => node.type === 'theme');
+    // 親カテゴリー（categoryTypeが'parent'またはparentCategoryIdがない）を取得
+    const categoryNodes = nodes.filter(node => 
+      node.type === 'category' && 
+      (node.data?.categoryType === 'parent' || !node.data?.parentCategoryId)
+    );
     
     // ノードIDからノードを取得するマップを作成
     const nodeMap = new Map<string, RelationshipNode>();
@@ -32,8 +37,45 @@ export function useHierarchyData(
       }
     });
 
-    // 階層構造を再帰的に構築
-    const buildHierarchy = (node: RelationshipNode, depth: number): any => {
+    // カテゴリー階層を構築
+    const buildCategoryHierarchy = (node: RelationshipNode, depth: number): any => {
+      const children = childrenMap.get(node.id) || [];
+      
+      // 子カテゴリーとスタートアップを分類
+      const childCategoryNodes = children.filter(n => n.type === 'category');
+      const startupNodes = children.filter(n => n.type === 'startup');
+      
+      // 子カテゴリーを再帰的に構築
+      const childCategories = childCategoryNodes.map(childCategoryNode => {
+        return buildCategoryHierarchy(childCategoryNode, depth + 1);
+      });
+      
+      // スタートアップノードを構築
+      const startups = startupNodes.map(startupNode => ({
+        name: startupNode.label,
+        id: startupNode.id,
+        value: 1,
+        depth: depth + (childCategories.length > 0 ? 2 : 1),
+        nodeType: startupNode.type,
+        originalData: startupNode,
+      }));
+      
+      // 子カテゴリーとスタートアップを結合
+      const allChildren = [...childCategories, ...startups];
+      
+      return {
+        name: node.label,
+        id: node.id,
+        value: 1,
+        depth: depth,
+        nodeType: node.type,
+        originalData: node,
+        children: allChildren.length > 0 ? allChildren : undefined,
+      };
+    };
+
+    // テーマ階層を構築（既存のロジック）
+    const buildThemeHierarchy = (node: RelationshipNode, depth: number): any => {
       const children = childrenMap.get(node.id) || [];
       
       // 子ノードをタイプごとに分類
@@ -91,10 +133,18 @@ export function useHierarchyData(
       };
     };
 
-    return {
-      name: 'root',
-      children: themeNodes.map(themeNode => buildHierarchy(themeNode, 1)),
-    };
+    // カテゴリーノードがある場合はカテゴリー階層を構築、なければテーマ階層を構築
+    if (categoryNodes.length > 0) {
+      return {
+        name: 'root',
+        children: categoryNodes.map(categoryNode => buildCategoryHierarchy(categoryNode, 1)),
+      };
+    } else {
+      return {
+        name: 'root',
+        children: themeNodes.map(themeNode => buildThemeHierarchy(themeNode, 1)),
+      };
+    }
   }, [nodes, links, showTopics]);
 }
 

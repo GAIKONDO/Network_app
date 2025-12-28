@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { getStartupById, saveStartup, getOrgTreeFromDb, getThemes, type Theme, getAllTopicsBatch, type TopicInfo, getAllMeetingNotes, getOrgMembers, getAllOrganizationsFromTree, generateUniqueId, type Startup, type OrgNodeData } from '@/lib/orgApi';
+import { getStartupById, saveStartup, getOrgTreeFromDb, getThemes, type Theme, getAllTopicsBatch, type TopicInfo, getAllMeetingNotes, getOrgMembers, getAllOrganizationsFromTree, generateUniqueId, type Startup, type OrgNodeData, getCategories, type Category, getVcs, type VC, getDepartments, type Department, getStatuses, type Status, getEngagementLevels, type EngagementLevel, getBizDevPhases, type BizDevPhase } from '@/lib/orgApi';
 import type { MeetingNote } from '@/lib/orgApi';
 
 // 開発環境でのみログを有効化するヘルパー関数
@@ -22,6 +22,12 @@ interface UseStartupDataReturn {
   startup: Startup | null;
   orgData: OrgNodeData | null;
   themes: Theme[];
+  categories: Category[];
+  vcs: VC[];
+  departments: Department[];
+  statuses: Status[];
+  engagementLevels: EngagementLevel[];
+  bizDevPhases: BizDevPhase[];
   topics: TopicInfo[];
   orgMembers: Array<{ id: string; name: string; position?: string }>;
   allOrgMembers: Array<{ id: string; name: string; position?: string; organizationId?: string }>;
@@ -55,6 +61,16 @@ interface UseStartupDataReturn {
     causeEffectCode: string;
     themeIds: string[];
     topicIds: string[];
+    categoryIds: string[];
+    relatedVCS: string[];
+    responsibleDepartments: string[];
+    status: string;
+    agencyContractMonth: string;
+    engagementLevel: string;
+    bizDevPhase: string;
+    hpUrl: string;
+    asanaUrl: string;
+    boxUrl: string;
     content: string;
   };
   
@@ -62,6 +78,12 @@ interface UseStartupDataReturn {
   setStartup: (startup: Startup | null) => void;
   setOrgData: (orgData: OrgNodeData | null) => void;
   setThemes: (themes: Theme[]) => void;
+  setCategories: (categories: Category[]) => void;
+  setVcs: (vcs: VC[]) => void;
+  setDepartments: (departments: Department[]) => void;
+  setStatuses: (statuses: Status[]) => void;
+  setEngagementLevels: (engagementLevels: EngagementLevel[]) => void;
+  setBizDevPhases: (bizDevPhases: BizDevPhase[]) => void;
   setTopics: (topics: TopicInfo[]) => void;
   setOrgMembers: (members: Array<{ id: string; name: string; position?: string }>) => void;
   setAllOrgMembers: (members: Array<{ id: string; name: string; position?: string; organizationId?: string }>) => void;
@@ -78,6 +100,12 @@ export function useStartupData(
   const [startup, setStartup] = useState<Startup | null>(null);
   const [orgData, setOrgData] = useState<OrgNodeData | null>(null);
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vcs, setVcs] = useState<VC[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [engagementLevels, setEngagementLevels] = useState<EngagementLevel[]>([]);
+  const [bizDevPhases, setBizDevPhases] = useState<BizDevPhase[]>([]);
   const [topics, setTopics] = useState<TopicInfo[]>([]);
   const [orgMembers, setOrgMembers] = useState<Array<{ id: string; name: string; position?: string }>>([]);
   const [allOrgMembers, setAllOrgMembers] = useState<Array<{ id: string; name: string; position?: string; organizationId?: string }>>([]);
@@ -107,6 +135,16 @@ export function useStartupData(
     causeEffectCode: '',
     themeIds: [],
     topicIds: [],
+    categoryIds: [],
+    relatedVCS: [],
+    responsibleDepartments: [],
+    status: '',
+    agencyContractMonth: '',
+    engagementLevel: '',
+    bizDevPhase: '',
+    hpUrl: '',
+    asanaUrl: '',
+    boxUrl: '',
     content: '',
   });
   
@@ -148,6 +186,66 @@ export function useStartupData(
         // テーマを取得
         const themesData = await getThemes();
         setThemes(themesData);
+        
+        // カテゴリーを取得
+        try {
+          const categoriesData = await getCategories();
+          setCategories(categoriesData);
+          devLog('✅ [ページ] カテゴリー取得完了:', { count: categoriesData.length });
+        } catch (categoryError: any) {
+          console.warn('⚠️ [ページ] カテゴリー取得に失敗:', categoryError);
+          setCategories([]);
+        }
+
+        let vcsData: VC[] = [];
+        try {
+          vcsData = await getVcs();
+          setVcs(vcsData);
+          devLog('✅ [ページ] VC取得完了:', { count: vcsData.length });
+        } catch (vcError: any) {
+          console.warn('⚠️ [ページ] VC取得に失敗:', vcError);
+          setVcs([]);
+        }
+
+        let departmentsData: Department[] = [];
+        try {
+          departmentsData = await getDepartments();
+          setDepartments(departmentsData);
+          devLog('✅ [ページ] 部署取得完了:', { count: departmentsData.length });
+        } catch (deptError: any) {
+          console.warn('⚠️ [ページ] 部署取得に失敗:', deptError);
+          setDepartments([]);
+        }
+
+        let statusesData: Status[] = [];
+        try {
+          statusesData = await getStatuses();
+          setStatuses(statusesData);
+          devLog('✅ [ページ] ステータス取得完了:', { count: statusesData.length });
+        } catch (statusError: any) {
+          console.warn('⚠️ [ページ] ステータス取得に失敗:', statusError);
+          setStatuses([]);
+        }
+
+        let engagementLevelsData: EngagementLevel[] = [];
+        try {
+          engagementLevelsData = await getEngagementLevels();
+          setEngagementLevels(engagementLevelsData);
+          devLog('✅ [ページ] ねじ込み注力度取得完了:', { count: engagementLevelsData.length });
+        } catch (engagementError: any) {
+          console.warn('⚠️ [ページ] ねじ込み注力度取得に失敗:', engagementError);
+          setEngagementLevels([]);
+        }
+
+        let bizDevPhasesData: BizDevPhase[] = [];
+        try {
+          bizDevPhasesData = await getBizDevPhases();
+          setBizDevPhases(bizDevPhasesData);
+          devLog('✅ [ページ] Biz-Devフェーズ取得完了:', { count: bizDevPhasesData.length });
+        } catch (bizDevError: any) {
+          console.warn('⚠️ [ページ] Biz-Devフェーズ取得に失敗:', bizDevError);
+          setBizDevPhases([]);
+        }
         
         // すべての組織を取得（モーダル用）
         let modalOrgTree: OrgNodeData | null = null;
@@ -344,6 +442,48 @@ export function useStartupData(
           ? startupData.themeIds
           : (startupData.themeId ? [startupData.themeId] : []);
         
+        // categoryIdsを取得
+        const categoryIdsValue = Array.isArray(startupData.categoryIds) && startupData.categoryIds.length > 0
+          ? startupData.categoryIds
+          : [];
+        
+        devLog('📖 [ページ] categoryIds取得:', {
+          categoryIdsFromStartup: startupData.categoryIds,
+          categoryIdsValue,
+          categoryIdsValueLength: categoryIdsValue.length,
+          isArray: Array.isArray(startupData.categoryIds),
+        });
+
+        // relatedVCSとresponsibleDepartmentsを取得
+        // 既存データが名前で保存されている可能性があるため、名前→IDの変換を試みる
+        // vcsDataとdepartmentsDataは既に取得済み
+        let relatedVCSValue: string[] = [];
+        if (Array.isArray(startupData.relatedVCS) && startupData.relatedVCS.length > 0) {
+          // データベースから取得したvcsDataを使用して名前→ID変換
+          relatedVCSValue = startupData.relatedVCS.map((vcValue: string) => {
+            // 既にIDの形式（vc_で始まる）の場合はそのまま使用
+            if (vcValue.startsWith('vc_')) {
+              return vcValue;
+            }
+            // 名前の場合は、vcsDataからIDを検索
+            const foundVc = vcsData.find(vc => vc.title === vcValue);
+            return foundVc ? foundVc.id : vcValue; // 見つからない場合は元の値を保持
+          });
+        }
+        
+        let responsibleDepartmentsValue: string[] = [];
+        if (Array.isArray(startupData.responsibleDepartments) && startupData.responsibleDepartments.length > 0) {
+          responsibleDepartmentsValue = startupData.responsibleDepartments.map((deptValue: string) => {
+            // 既にIDの形式（dept_で始まる）の場合はそのまま使用
+            if (deptValue.startsWith('dept_')) {
+              return deptValue;
+            }
+            // 名前の場合は、departmentsDataからIDを検索
+            const foundDept = departmentsData.find(dept => dept.title === deptValue);
+            return foundDept ? foundDept.id : deptValue; // 見つからない場合は元の値を保持
+          });
+        }
+        
         // 個別トピックを取得
         const topicsData = await getAllTopicsBatch();
         setTopics(topicsData);
@@ -377,6 +517,16 @@ export function useStartupData(
           causeEffectCode: causeEffectCodeValue,
           themeIds: themeIdsValue,
           topicIds: topicIdsValue,
+          categoryIds: categoryIdsValue,
+          relatedVCS: relatedVCSValue,
+          responsibleDepartments: responsibleDepartmentsValue,
+          status: startupData.status || '',
+          agencyContractMonth: startupData.agencyContractMonth || '',
+          engagementLevel: startupData.engagementLevel || '',
+          bizDevPhase: startupData.bizDevPhase || '',
+          hpUrl: startupData.hpUrl || '',
+          asanaUrl: startupData.asanaUrl || '',
+          boxUrl: startupData.boxUrl || '',
           content: startupData.content || '',
         });
         
@@ -399,6 +549,12 @@ export function useStartupData(
     startup,
     orgData,
     themes,
+    categories,
+    vcs,
+    departments,
+    statuses,
+    engagementLevels,
+    bizDevPhases,
     topics,
     orgMembers,
     allOrgMembers,
@@ -411,6 +567,12 @@ export function useStartupData(
     setStartup,
     setOrgData,
     setThemes,
+    setCategories,
+    setVcs,
+    setDepartments,
+    setStatuses,
+    setEngagementLevels,
+    setBizDevPhases,
     setTopics,
     setOrgMembers,
     setAllOrgMembers,

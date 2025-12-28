@@ -35,6 +35,16 @@ interface UseStartupSaveProps {
   localCauseEffectCode: string;
   localThemeIds: string[];
   localTopicIds: string[];
+  localCategory: string[];
+  localRelatedVCs: string[];
+  localResponsibleDepts: string[];
+  localStatus: string;
+  localAgencyContractMonth: string;
+  localEngagementLevel: string;
+  localBizDevPhase: string;
+  localHpUrl: string;
+  localAsanaUrl: string;
+  localBoxUrl: string;
   setStartup: (startup: Startup) => void;
   setEditingContent: (content: string) => void;
   setLocalAssignee: (assignee: string[]) => void;
@@ -56,6 +66,16 @@ interface UseStartupSaveProps {
   setLocalRelationDiagram: (diagram: string) => void;
   setLocalThemeIds: (ids: string[]) => void;
   setLocalTopicIds: (ids: string[]) => void;
+  setLocalCategory: (categoryIds: string[]) => void;
+  setLocalRelatedVCs: (vcs: string[]) => void;
+  setLocalResponsibleDepts: (depts: string[]) => void;
+  setLocalStatus: (status: string) => void;
+  setLocalAgencyContractMonth: (month: string) => void;
+  setLocalEngagementLevel: (level: string) => void;
+  setLocalBizDevPhase: (phase: string) => void;
+  setLocalHpUrl: (url: string) => void;
+  setLocalAsanaUrl: (url: string) => void;
+  setLocalBoxUrl: (url: string) => void;
   setSavingStatus: (status: 'idle' | 'saving' | 'saved') => void;
 }
 
@@ -83,6 +103,16 @@ export function useStartupSave({
   localCauseEffectCode,
   localThemeIds,
   localTopicIds,
+  localCategory,
+  localRelatedVCs,
+  localResponsibleDepts,
+  localStatus,
+  localAgencyContractMonth,
+  localEngagementLevel,
+  localBizDevPhase,
+  localHpUrl,
+  localAsanaUrl,
+  localBoxUrl,
   setStartup,
   setEditingContent,
   setLocalAssignee,
@@ -104,13 +134,81 @@ export function useStartupSave({
   setLocalRelationDiagram,
   setLocalThemeIds,
   setLocalTopicIds,
+  setLocalCategory,
+  setLocalRelatedVCs,
+  setLocalResponsibleDepts,
+  setLocalStatus,
+  setLocalAgencyContractMonth,
+  setLocalEngagementLevel,
+  setLocalBizDevPhase,
+  setLocalHpUrl,
+  setLocalAsanaUrl,
+  setLocalBoxUrl,
   setSavingStatus,
 }: UseStartupSaveProps) {
   const handleManualSave = useCallback(async () => {
     if (!startup) return;
     
+    // デバッグ: 保存前のlocalCategoryの状態を確認
+    devLog('💾 [handleManualSave] 保存前のlocalCategory:', {
+      localCategory,
+      localCategoryLength: localCategory?.length || 0,
+      localCategoryType: typeof localCategory,
+      isArray: Array.isArray(localCategory),
+    });
+    
+    devLog('💾 [handleManualSave] 保存前のlocalRelatedVCs:', {
+      localRelatedVCs,
+      localRelatedVCsLength: localRelatedVCs?.length || 0,
+      localRelatedVCsType: typeof localRelatedVCs,
+      isArray: Array.isArray(localRelatedVCs),
+    });
+    
+    devLog('💾 [handleManualSave] 保存前のlocalResponsibleDepts:', {
+      localResponsibleDepts,
+      localResponsibleDeptsLength: localResponsibleDepts?.length || 0,
+      localResponsibleDeptsType: typeof localResponsibleDepts,
+      isArray: Array.isArray(localResponsibleDepts),
+    });
+    
     // 保存するデータを構築
-    const dataToSave: Partial<Startup> = {
+    const categoryIdsToSave = Array.isArray(localCategory) ? localCategory : [];
+    devLog('💾 [handleManualSave] categoryIdsToSave:', {
+      categoryIdsToSave,
+      categoryIdsToSaveLength: categoryIdsToSave.length,
+    });
+    
+    const relatedVCsToSave = Array.isArray(localRelatedVCs) ? localRelatedVCs : [];
+    devLog('💾 [handleManualSave] relatedVCsToSave:', {
+      relatedVCsToSave,
+      relatedVCsToSaveLength: relatedVCsToSave.length,
+    });
+    
+    const responsibleDeptsToSave = Array.isArray(localResponsibleDepts) ? localResponsibleDepts : [];
+    devLog('💾 [handleManualSave] responsibleDeptsToSave:', {
+      responsibleDeptsToSave,
+      responsibleDeptsToSaveLength: responsibleDeptsToSave.length,
+    });
+    
+    devLog('💾 [handleManualSave] 保存前のlocalStatus:', {
+      localStatus,
+      localStatusType: typeof localStatus,
+      localStatusLength: localStatus?.length || 0,
+    });
+    
+    devLog('💾 [handleManualSave] 保存前のlocalEngagementLevel:', {
+      localEngagementLevel,
+      localEngagementLevelType: typeof localEngagementLevel,
+      localEngagementLevelLength: localEngagementLevel?.length || 0,
+    });
+    
+    devLog('💾 [handleManualSave] 保存前のlocalBizDevPhase:', {
+      localBizDevPhase,
+      localBizDevPhaseType: typeof localBizDevPhase,
+      localBizDevPhaseLength: localBizDevPhase?.length || 0,
+    });
+    
+    const dataToSave = {
       ...startup,
       content: editingContent,
       assignee: localAssignee.length > 0 ? localAssignee.join(', ') : undefined,
@@ -132,6 +230,16 @@ export function useStartupSave({
       relationDiagram: localRelationDiagram,
       themeIds: Array.isArray(localThemeIds) ? localThemeIds : (localThemeIds ? [localThemeIds] : []),
       topicIds: Array.isArray(localTopicIds) ? localTopicIds : (localTopicIds ? [localTopicIds] : []),
+      categoryIds: categoryIdsToSave,
+      relatedVCS: relatedVCsToSave,
+      responsibleDepartments: responsibleDeptsToSave,
+      status: localStatus || undefined,
+      agencyContractMonth: localAgencyContractMonth || undefined,
+      engagementLevel: localEngagementLevel || undefined,
+      bizDevPhase: localBizDevPhase || undefined,
+      hpUrl: localHpUrl || undefined,
+      asanaUrl: localAsanaUrl || undefined,
+      boxUrl: localBoxUrl || undefined,
       // 特性要因図のコードからデータを更新
       ...(() => {
         try {
@@ -150,11 +258,33 @@ export function useStartupSave({
       })(),
     };
     
-    devLog('💾 [handleManualSave] 保存開始:', {
+    devLog('💾 [handleManualSave] dataToSave構築後:', {
+      status: dataToSave.status,
+      engagementLevel: dataToSave.engagementLevel,
+      bizDevPhase: dataToSave.bizDevPhase,
+      localStatus,
+      localEngagementLevel,
+      localBizDevPhase,
+    });
+    
+      devLog('💾 [handleManualSave] 保存開始:', {
       startupId,
       contentLength: dataToSave.content?.length || 0,
       themeIdsCount: Array.isArray(dataToSave.themeIds) ? dataToSave.themeIds.length : 0,
       topicIdsCount: Array.isArray(dataToSave.topicIds) ? dataToSave.topicIds.length : 0,
+      categoryIdsCount: Array.isArray(dataToSave.categoryIds) ? dataToSave.categoryIds.length : 0,
+      categoryIds: dataToSave.categoryIds,
+      relatedVCSCount: Array.isArray(dataToSave.relatedVCS) ? dataToSave.relatedVCS.length : 0,
+      relatedVCS: dataToSave.relatedVCS,
+      responsibleDepartmentsCount: Array.isArray(dataToSave.responsibleDepartments) ? dataToSave.responsibleDepartments.length : 0,
+      responsibleDepartments: dataToSave.responsibleDepartments,
+      status: dataToSave.status,
+      engagementLevel: dataToSave.engagementLevel,
+      bizDevPhase: dataToSave.bizDevPhase,
+      agencyContractMonth: dataToSave.agencyContractMonth,
+      hpUrl: dataToSave.hpUrl,
+      asanaUrl: dataToSave.asanaUrl,
+      boxUrl: dataToSave.boxUrl,
       hasEvaluationChart: !!dataToSave.evaluationChart,
       evaluationChartAxesCount: dataToSave.evaluationChart?.axes?.length || 0,
       evaluationChartSnapshotsCount: Array.isArray(dataToSave.evaluationChartSnapshots) ? dataToSave.evaluationChartSnapshots.length : 0,
@@ -199,6 +329,53 @@ export function useStartupSave({
       setLocalRelationDiagram(dataToSave.relationDiagram || '');
       setLocalThemeIds(Array.isArray(dataToSave.themeIds) ? dataToSave.themeIds : (dataToSave.themeId ? [dataToSave.themeId] : []));
       setLocalTopicIds(Array.isArray(dataToSave.topicIds) ? dataToSave.topicIds : []);
+      
+      const savedCategoryIds = Array.isArray(dataToSave.categoryIds) ? dataToSave.categoryIds : [];
+      devLog('💾 [handleManualSave] categoryIds保存:', {
+        savedCategoryIds,
+        savedCategoryIdsLength: savedCategoryIds.length,
+        dataToSaveCategoryIds: dataToSave.categoryIds,
+      });
+      setLocalCategory(savedCategoryIds);
+      
+      const savedRelatedVCs = Array.isArray(dataToSave.relatedVCS) ? dataToSave.relatedVCS : [];
+      devLog('💾 [handleManualSave] relatedVCS保存:', {
+        savedRelatedVCs,
+        savedRelatedVCsLength: savedRelatedVCs.length,
+        dataToSaveRelatedVCS: dataToSave.relatedVCS,
+      });
+      setLocalRelatedVCs(savedRelatedVCs);
+      
+      const savedResponsibleDepts = Array.isArray(dataToSave.responsibleDepartments) ? dataToSave.responsibleDepartments : [];
+      devLog('💾 [handleManualSave] responsibleDepartments保存:', {
+        savedResponsibleDepts,
+        savedResponsibleDeptsLength: savedResponsibleDepts.length,
+        dataToSaveResponsibleDepartments: dataToSave.responsibleDepartments,
+      });
+      setLocalResponsibleDepts(savedResponsibleDepts);
+      
+      devLog('💾 [handleManualSave] status保存:', {
+        savedStatus: dataToSave.status,
+        dataToSaveStatus: dataToSave.status,
+      });
+      setLocalStatus(dataToSave.status || '');
+      
+      devLog('💾 [handleManualSave] engagementLevel保存:', {
+        savedEngagementLevel: dataToSave.engagementLevel,
+        dataToSaveEngagementLevel: dataToSave.engagementLevel,
+      });
+      setLocalEngagementLevel(dataToSave.engagementLevel || '');
+      
+      devLog('💾 [handleManualSave] bizDevPhase保存:', {
+        savedBizDevPhase: dataToSave.bizDevPhase,
+        dataToSaveBizDevPhase: dataToSave.bizDevPhase,
+      });
+      setLocalBizDevPhase(dataToSave.bizDevPhase || '');
+      
+      setLocalAgencyContractMonth(dataToSave.agencyContractMonth || '');
+      setLocalHpUrl(dataToSave.hpUrl || '');
+      setLocalAsanaUrl(dataToSave.asanaUrl || '');
+      setLocalBoxUrl(dataToSave.boxUrl || '');
       
       setSavingStatus('saved');
       setTimeout(() => setSavingStatus('idle'), 2000);
@@ -250,6 +427,26 @@ export function useStartupSave({
     setLocalRelationDiagram,
     setLocalThemeIds,
     setLocalTopicIds,
+    localCategory,
+    localRelatedVCs,
+    localResponsibleDepts,
+    localStatus,
+    localAgencyContractMonth,
+    localEngagementLevel,
+    localBizDevPhase,
+    localHpUrl,
+    localAsanaUrl,
+    localBoxUrl,
+    setLocalCategory,
+    setLocalRelatedVCs,
+    setLocalResponsibleDepts,
+    setLocalStatus,
+    setLocalAgencyContractMonth,
+    setLocalEngagementLevel,
+    setLocalBizDevPhase,
+    setLocalHpUrl,
+    setLocalAsanaUrl,
+    setLocalBoxUrl,
     setSavingStatus,
   ]);
 
@@ -275,6 +472,9 @@ export function useStartupSave({
         relatedGroupCompanies: localRelatedGroupCompanies,
         monetizationDiagram: localMonetizationDiagram,
         relationDiagram: localRelationDiagram,
+        themeIds: Array.isArray(localThemeIds) ? localThemeIds : (localThemeIds ? [localThemeIds] : []),
+        topicIds: Array.isArray(localTopicIds) ? localTopicIds : [],
+        categoryIds: Array.isArray(localCategory) ? localCategory : [],
       } as Startup;
       
       // JSON文字列に変換

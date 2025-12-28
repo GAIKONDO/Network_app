@@ -148,6 +148,16 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
       themeId: startup.themeId || '',
       themeIds: Array.isArray(startup.themeIds) ? startup.themeIds : (startup.themeIds ? [startup.themeIds] : []),
       topicIds: Array.isArray(startup.topicIds) ? startup.topicIds : (startup.topicIds ? [startup.topicIds] : []),
+      categoryIds: Array.isArray(startup.categoryIds) ? startup.categoryIds : [],
+      relatedVCS: Array.isArray(startup.relatedVCS) ? startup.relatedVCS : [],
+      responsibleDepartments: Array.isArray(startup.responsibleDepartments) ? startup.responsibleDepartments : [],
+      status: startup.status || undefined,
+      agencyContractMonth: startup.agencyContractMonth || undefined,
+      engagementLevel: startup.engagementLevel || undefined,
+      bizDevPhase: startup.bizDevPhase || undefined,
+      hpUrl: startup.hpUrl || undefined,
+      asanaUrl: startup.asanaUrl || undefined,
+      boxUrl: startup.boxUrl || undefined,
       updatedAt: now,
     };
     
@@ -235,8 +245,11 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
           relatedOrganizations: Array.isArray(data.relatedOrganizations) && data.relatedOrganizations.length > 0 ? JSON.stringify(data.relatedOrganizations) : null,
           relatedGroupCompanies: Array.isArray(data.relatedGroupCompanies) && data.relatedGroupCompanies.length > 0 ? JSON.stringify(data.relatedGroupCompanies) : null,
           methodDetails: data.methodDetails && Object.keys(data.methodDetails).length > 0 ? JSON.stringify(data.methodDetails) : null,
-          themeIds: Array.isArray(data.themeIds) && data.themeIds.length > 0 ? JSON.stringify(data.themeIds) : null,
-          topicIds: Array.isArray(data.topicIds) && data.topicIds.length > 0 ? JSON.stringify(data.topicIds) : null,
+          themeIds: Array.isArray(data.themeIds) ? (data.themeIds.length > 0 ? JSON.stringify(data.themeIds) : '[]') : '[]',
+          topicIds: Array.isArray(data.topicIds) ? (data.topicIds.length > 0 ? JSON.stringify(data.topicIds) : '[]') : '[]',
+          categoryIds: Array.isArray(data.categoryIds) ? (data.categoryIds.length > 0 ? JSON.stringify(data.categoryIds) : '[]') : '[]',
+          relatedVCS: Array.isArray(data.relatedVCS) ? (data.relatedVCS.length > 0 ? JSON.stringify(data.relatedVCS) : '[]') : '[]',
+          responsibleDepartments: Array.isArray(data.responsibleDepartments) ? (data.responsibleDepartments.length > 0 ? JSON.stringify(data.responsibleDepartments) : '[]') : '[]',
           evaluationChart: data.evaluationChart ? JSON.stringify(data.evaluationChart) : null,
           evaluationChartSnapshots: Array.isArray(data.evaluationChartSnapshots) && data.evaluationChartSnapshots.length > 0 ? JSON.stringify(data.evaluationChartSnapshots) : null,
         };
@@ -251,6 +264,21 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
           dataForDbKeys: Object.keys(dataForDb),
           evaluationChartInDataForDb: 'evaluationChart' in dataForDb,
           evaluationChartSnapshotsInDataForDb: 'evaluationChartSnapshots' in dataForDb,
+          hasCategoryIds: 'categoryIds' in dataForDb,
+          categoryIds: dataForDb.categoryIds,
+          categoryIdsType: typeof dataForDb.categoryIds,
+          categoryIdsValue: data.categoryIds,
+          categoryIdsValueLength: Array.isArray(data.categoryIds) ? data.categoryIds.length : 0,
+          hasRelatedVCS: 'relatedVCS' in dataForDb,
+          relatedVCS: dataForDb.relatedVCS,
+          relatedVCSType: typeof dataForDb.relatedVCS,
+          relatedVCSValue: data.relatedVCS,
+          relatedVCSValueLength: Array.isArray(data.relatedVCS) ? data.relatedVCS.length : 0,
+          hasResponsibleDepartments: 'responsibleDepartments' in dataForDb,
+          responsibleDepartments: dataForDb.responsibleDepartments,
+          responsibleDepartmentsType: typeof dataForDb.responsibleDepartments,
+          responsibleDepartmentsValue: data.responsibleDepartments,
+          responsibleDepartmentsValueLength: Array.isArray(data.responsibleDepartments) ? data.responsibleDepartments.length : 0,
         });
         
         await callTauriCommand('doc_set', {
@@ -268,6 +296,22 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
           organizationId: data.organizationId,
           hasEvaluationChart: !!data.evaluationChart,
           hasEvaluationChartSnapshots: Array.isArray(data.evaluationChartSnapshots) && data.evaluationChartSnapshots.length > 0,
+          categoryIds: data.categoryIds,
+          categoryIdsLength: Array.isArray(data.categoryIds) ? data.categoryIds.length : 0,
+          categoryIdsInDataForDb: dataForDb.categoryIds,
+          status: data.status,
+          engagementLevel: data.engagementLevel,
+          bizDevPhase: data.bizDevPhase,
+          agencyContractMonth: data.agencyContractMonth,
+          hpUrl: data.hpUrl,
+          asanaUrl: data.asanaUrl,
+          boxUrl: data.boxUrl,
+          relatedVCS: data.relatedVCS,
+          relatedVCSLength: Array.isArray(data.relatedVCS) ? data.relatedVCS.length : 0,
+          relatedVCSInDataForDb: dataForDb.relatedVCS,
+          responsibleDepartments: data.responsibleDepartments,
+          responsibleDepartmentsLength: Array.isArray(data.responsibleDepartments) ? data.responsibleDepartments.length : 0,
+          responsibleDepartmentsInDataForDb: dataForDb.responsibleDepartments,
         });
       } else {
         await setDoc(docRef, data);
@@ -327,21 +371,33 @@ export async function getStartupById(startupId: string): Promise<Startup | null>
           hasEvaluationChartSnapshots: !!data.evaluationChartSnapshots,
           evaluationChartSnapshotsType: typeof data.evaluationChartSnapshots,
           allDataKeys: Object.keys(data),
+          hasCategoryIds: 'categoryIds' in data,
+          categoryIds: data.categoryIds,
+          categoryIdsType: typeof data.categoryIds,
+          categoryIdsValue: data.categoryIds ? (typeof data.categoryIds === 'string' ? data.categoryIds.substring(0, 200) : JSON.stringify(data.categoryIds).substring(0, 200)) : null,
+          categoryIdsLength: typeof data.categoryIds === 'string' ? data.categoryIds.length : (Array.isArray(data.categoryIds) ? data.categoryIds.length : 'N/A'),
         });
         
-        const parseJsonArray = (value: any): string[] => {
+        const parseJsonArray = (value: any, fieldName: string = 'unknown'): string[] => {
           if (Array.isArray(value)) {
+            console.log(`📖 [getStartupById] parseJsonArray(${fieldName}): 既に配列`, value);
             return value;
           }
           if (typeof value === 'string') {
             try {
               const parsed = JSON.parse(value);
+              console.log(`📖 [getStartupById] parseJsonArray(${fieldName}): JSONパース成功`, parsed);
               return Array.isArray(parsed) ? parsed : [];
             } catch (e) {
-              console.warn('⚠️ [getStartupById] JSONパースエラー:', e, 'value:', value);
+              console.warn(`⚠️ [getStartupById] parseJsonArray(${fieldName}) JSONパースエラー:`, e, 'value:', value);
               return [];
             }
           }
+          if (value === null || value === undefined) {
+            console.log(`📖 [getStartupById] parseJsonArray(${fieldName}): null/undefined`);
+            return [];
+          }
+          console.log(`📖 [getStartupById] parseJsonArray(${fieldName}): その他の型`, typeof value, value);
           return [];
         };
         
@@ -407,8 +463,18 @@ export async function getStartupById(startupId: string): Promise<Startup | null>
           relationDiagramId: data.relationDiagramId || '',
           causeEffectDiagramId: data.causeEffectDiagramId || '',
           themeId: data.themeId || '',
-          themeIds: parseJsonArray(data.themeIds),
-          topicIds: parseJsonArray(data.topicIds),
+          themeIds: parseJsonArray(data.themeIds, 'themeIds'),
+          topicIds: parseJsonArray(data.topicIds, 'topicIds'),
+          categoryIds: parseJsonArray(data.categoryIds, 'categoryIds'),
+          relatedVCS: parseJsonArray(data.relatedVCS, 'relatedVCS'),
+          responsibleDepartments: parseJsonArray(data.responsibleDepartments, 'responsibleDepartments'),
+          status: data.status,
+          agencyContractMonth: data.agencyContractMonth,
+          engagementLevel: data.engagementLevel,
+          bizDevPhase: data.bizDevPhase,
+          hpUrl: data.hpUrl,
+          asanaUrl: data.asanaUrl,
+          boxUrl: data.boxUrl,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         };
@@ -424,6 +490,22 @@ export async function getStartupById(startupId: string): Promise<Startup | null>
           evaluationChartSnapshotsType: typeof startup.evaluationChartSnapshots,
           rawEvaluationChartType: typeof data.evaluationChart,
           rawEvaluationChartSnapshotsType: typeof data.evaluationChartSnapshots,
+          categoryIds: startup.categoryIds,
+          categoryIdsLength: startup.categoryIds?.length || 0,
+          relatedVCS: startup.relatedVCS,
+          relatedVCSLength: startup.relatedVCS?.length || 0,
+          responsibleDepartments: startup.responsibleDepartments,
+          responsibleDepartmentsLength: startup.responsibleDepartments?.length || 0,
+          status: startup.status,
+          engagementLevel: startup.engagementLevel,
+          bizDevPhase: startup.bizDevPhase,
+          agencyContractMonth: startup.agencyContractMonth,
+          hpUrl: startup.hpUrl,
+          asanaUrl: startup.asanaUrl,
+          boxUrl: startup.boxUrl,
+          rawStatus: data.status,
+          rawEngagementLevel: data.engagementLevel,
+          rawBizDevPhase: data.bizDevPhase,
         });
         
         return startup;
@@ -469,6 +551,124 @@ export async function deleteStartup(startupId: string): Promise<void> {
   } catch (error: any) {
     console.error('❌ [deleteStartup] エラー:', error);
     throw error;
+  }
+}
+
+/**
+ * すべてのスタートアップを取得（組織ID指定なし）
+ */
+export async function getAllStartups(): Promise<Startup[]> {
+  try {
+    console.log('📖 [getAllStartups] 開始');
+    
+    const { callTauriCommand } = await import('../localFirebase');
+    
+    try {
+      const result = await callTauriCommand('collection_get', {
+        collectionName: 'startups',
+      });
+      
+      // 結果が配列でない場合（オブジェクトの場合）、配列に変換
+      let resultArray: any[] = [];
+      if (Array.isArray(result)) {
+        resultArray = result;
+      } else if (result && typeof result === 'object') {
+        resultArray = Object.values(result);
+      } else {
+        return [];
+      }
+      
+      const parseJsonArray = (value: any): string[] => {
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            return [];
+          }
+        }
+        return [];
+      };
+      
+      const startups = resultArray.map((item: any) => {
+        const data = item.data || item;
+        const itemId = item.id || data.id;
+        
+        let createdAt: any = null;
+        let updatedAt: any = null;
+        
+        if (data.createdAt) {
+          if (data.createdAt.seconds) {
+            createdAt = new Date(data.createdAt.seconds * 1000).toISOString();
+          } else if (typeof data.createdAt === 'string') {
+            createdAt = data.createdAt;
+          }
+        }
+        
+        if (data.updatedAt) {
+          if (data.updatedAt.seconds) {
+            updatedAt = new Date(data.updatedAt.seconds * 1000).toISOString();
+          } else if (typeof data.updatedAt === 'string') {
+            updatedAt = data.updatedAt;
+          }
+        }
+        
+        return {
+          id: itemId,
+          organizationId: data.organizationId,
+          companyId: data.companyId,
+          title: data.title || '',
+          description: data.description || '',
+          content: data.content || '',
+          assignee: parseJsonArray(data.assignee),
+          categoryIds: parseJsonArray(data.categoryIds),
+          status: data.status,
+          agencyContractMonth: data.agencyContractMonth,
+          engagementLevel: data.engagementLevel,
+          bizDevPhase: data.bizDevPhase,
+          relatedVCS: parseJsonArray(data.relatedVCS),
+          responsibleDepartments: parseJsonArray(data.responsibleDepartments),
+          hpUrl: data.hpUrl,
+          asanaUrl: data.asanaUrl,
+          boxUrl: data.boxUrl,
+          objective: data.objective,
+          evaluation: data.evaluation,
+          evaluationChart: data.evaluationChart,
+          evaluationChartSnapshots: data.evaluationChartSnapshots,
+          considerationPeriod: data.considerationPeriod,
+          executionPeriod: data.executionPeriod,
+          monetizationPeriod: data.monetizationPeriod,
+          relatedOrganizations: parseJsonArray(data.relatedOrganizations),
+          relatedGroupCompanies: parseJsonArray(data.relatedGroupCompanies),
+          monetizationDiagram: data.monetizationDiagram,
+          monetizationDiagramId: data.monetizationDiagramId,
+          relationDiagram: data.relationDiagram,
+          relationDiagramId: data.relationDiagramId,
+          causeEffectDiagramId: data.causeEffectDiagramId,
+          themeId: data.themeId,
+          themeIds: parseJsonArray(data.themeIds),
+          topicIds: parseJsonArray(data.topicIds),
+          createdAt: createdAt,
+          updatedAt: updatedAt,
+        } as Startup;
+      });
+      
+      const sorted = startups.sort((a, b) => {
+        const aTime = a.createdAt ? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0) : 0;
+        const bTime = b.createdAt ? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0) : 0;
+        return bTime - aTime;
+      });
+      
+      console.log('✅ [getAllStartups] 取得成功:', sorted.length, '件');
+      return sorted;
+    } catch (collectionError: any) {
+      console.error('📖 [getAllStartups] collection_getエラー:', collectionError);
+      return [];
+    }
+  } catch (error: any) {
+    console.error('❌ [getAllStartups] エラー:', error);
+    return [];
   }
 }
 

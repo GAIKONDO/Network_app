@@ -633,6 +633,16 @@ impl Database {
             ("themeId", "TEXT"),
             ("themeIds", "TEXT"),
             ("topicIds", "TEXT"),
+            ("categoryIds", "TEXT"),
+            ("relatedVCS", "TEXT"),
+            ("responsibleDepartments", "TEXT"),
+            ("status", "TEXT"),
+            ("agencyContractMonth", "TEXT"),
+            ("engagementLevel", "TEXT"),
+            ("bizDevPhase", "TEXT"),
+            ("hpUrl", "TEXT"),
+            ("asanaUrl", "TEXT"),
+            ("boxUrl", "TEXT"),
         ];
         for (column_name, column_type) in startups_columns_to_add {
             let column_exists: bool = conn.query_row(
@@ -887,6 +897,158 @@ impl Database {
             
             tx.commit()?;
             init_log!("✅ positionカラムの追加と初期値設定が完了しました");
+        }
+
+        // カテゴリーテーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS categories (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                parentCategoryId TEXT,
+                position INTEGER,
+                createdAt TEXT,
+                updatedAt TEXT
+            )",
+            [],
+        )?;
+        
+        // VCテーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS vcs (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                position INTEGER,
+                createdAt TEXT,
+                updatedAt TEXT
+            )",
+            [],
+        )?;
+        init_log!("✅ vcsテーブルを作成しました");
+        
+        // vcsテーブルにインデックスを作成
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vcs_id ON vcs(id)",
+            [],
+        )?;
+        
+        // 部署テーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS departments (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                position INTEGER,
+                createdAt TEXT,
+                updatedAt TEXT
+            )",
+            [],
+        )?;
+        init_log!("✅ departmentsテーブルを作成しました");
+
+        // statusesテーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS statuses (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                position INTEGER,
+                createdAt TEXT,
+                updatedAt TEXT
+            )",
+            [],
+        )?;
+        init_log!("✅ statusesテーブルを作成しました");
+
+        // engagementLevelsテーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS engagementLevels (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                position INTEGER,
+                createdAt TEXT,
+                updatedAt TEXT
+            )",
+            [],
+        )?;
+        init_log!("✅ engagementLevelsテーブルを作成しました");
+
+        // bizDevPhasesテーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS bizDevPhases (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                position INTEGER,
+                createdAt TEXT,
+                updatedAt TEXT
+            )",
+            [],
+        )?;
+        init_log!("✅ bizDevPhasesテーブルを作成しました");
+        
+        // departmentsテーブルにインデックスを作成
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_departments_id ON departments(id)",
+            [],
+        )?;
+        
+        // positionカラムのマイグレーション（既存テーブルにカラムが存在しない場合）
+        let category_position_exists: bool = conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name = 'position'",
+            [],
+            |row| Ok(row.get::<_, i32>(0)? > 0),
+        ).unwrap_or(false);
+
+        if !category_position_exists {
+            init_log!("🔧 categoriesテーブルにpositionカラムを追加します...");
+            
+            // トランザクション内で実行（安全性のため）
+            let tx = conn.unchecked_transaction()?;
+            
+            // カラム追加
+            tx.execute(
+                "ALTER TABLE categories ADD COLUMN position INTEGER",
+                [],
+            )?;
+            
+            // 既存データにpositionを設定（createdAt順に連番を割り当て）
+            tx.execute(
+                "UPDATE categories SET position = (
+                    SELECT COUNT(*) + 1 FROM categories c2 
+                    WHERE (c2.createdAt < categories.createdAt) 
+                    OR (c2.createdAt = categories.createdAt AND c2.title < categories.title)
+                    OR (c2.createdAt = categories.createdAt AND c2.title = categories.title AND c2.id < categories.id)
+                )",
+                [],
+            )?;
+            
+            // positionカラムにインデックスを追加（パフォーマンス向上）
+            tx.execute(
+                "CREATE INDEX IF NOT EXISTS idx_categories_position ON categories(position)",
+                [],
+            )?;
+            
+            tx.commit()?;
+            init_log!("✅ categoriesテーブルのpositionカラムの追加と初期値設定が完了しました");
+        }
+
+        // parentCategoryIdカラムのマイグレーション（既存テーブルにカラムが存在しない場合）
+        let category_parent_exists: bool = conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name = 'parentCategoryId'",
+            [],
+            |row| Ok(row.get::<_, i32>(0)? > 0),
+        ).unwrap_or(false);
+
+        if !category_parent_exists {
+            init_log!("🔧 categoriesテーブルにparentCategoryIdカラムを追加します...");
+            conn.execute(
+                "ALTER TABLE categories ADD COLUMN parentCategoryId TEXT",
+                [],
+            )?;
+            init_log!("✅ categoriesテーブルのparentCategoryIdカラムの追加が完了しました");
         }
 
         // テーマ階層設定テーブル（A2C100用）
@@ -1460,6 +1622,7 @@ impl Database {
         conn.execute("CREATE INDEX IF NOT EXISTS idx_meetingNotes_companyId ON meetingNotes(companyId)", [])?;
         conn.execute("CREATE INDEX IF NOT EXISTS idx_companyContents_companyId ON companyContents(companyId)", [])?;
         conn.execute("CREATE INDEX IF NOT EXISTS idx_themes_id ON themes(id)", [])?;
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_categories_id ON categories(id)", [])?;
         conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_organizationId ON entities(organizationId)", [])?;
         conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_companyId ON entities(companyId)", [])?;
         conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type)", [])?;

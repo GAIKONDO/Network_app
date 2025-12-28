@@ -110,22 +110,34 @@ export default function EvaluationChart({
         <button
           onClick={onEdit}
           style={{
-            padding: '8px 16px',
-            backgroundColor: '#10B981',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: 500,
-            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            justifyContent: 'center',
+            width: '32px',
+            height: '32px',
+            padding: 0,
+            backgroundColor: 'transparent',
+            color: '#10B981',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            opacity: 0.6,
+            transition: 'all 0.2s ease',
             margin: '0 auto',
           }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+            e.currentTarget.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.opacity = '0.6';
+          }}
+          title="チャートを作成"
         >
-          <span>✏️</span>
-          <span>チャートを作成</span>
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+          </svg>
         </button>
       </div>
     );
@@ -137,42 +149,74 @@ export default function EvaluationChart({
         <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#374151', margin: 0 }}>
           評価チャート
         </h3>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           {!isEditing && (
             <>
               <button
                 onClick={() => setShowSnapshotModal(true)}
                 style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#6B7280',
-                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  padding: 0,
+                  backgroundColor: 'transparent',
+                  color: '#6B7280',
                   border: 'none',
                   borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: 500,
                   cursor: 'pointer',
+                  opacity: 0.3,
+                  transition: 'all 0.2s ease',
                 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(107, 114, 128, 0.08)';
+                  e.currentTarget.style.opacity = '0.6';
+                  e.currentTarget.style.color = '#6B7280';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.opacity = '0.3';
+                  e.currentTarget.style.color = '#6B7280';
+                }}
+                title="スナップショット保存"
               >
-                スナップショット保存
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+                  <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+                </svg>
               </button>
               <button
                 onClick={onEdit}
                 style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#10B981',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  padding: 0,
+                  backgroundColor: 'transparent',
+                  color: '#9CA3AF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  opacity: 0.3,
+                  transition: 'all 0.2s ease',
                 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(107, 114, 128, 0.08)';
+                  e.currentTarget.style.opacity = '0.6';
+                  e.currentTarget.style.color = '#6B7280';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.opacity = '0.3';
+                  e.currentTarget.style.color = '#9CA3AF';
+                }}
+                title="編集"
               >
-                <span>✏️</span>
-                <span>編集</span>
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
               </button>
             </>
           )}
@@ -180,21 +224,31 @@ export default function EvaluationChart({
             <button
               onClick={onSave}
               style={{
-                padding: '6px 12px',
-                backgroundColor: '#10B981',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: 500,
-                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                padding: 0,
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                color: '#10B981',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                opacity: 1,
+                transition: 'all 0.2s ease',
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+              }}
+              title="保存"
             >
-              <span>💾</span>
-              <span>保存</span>
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
             </button>
           )}
         </div>

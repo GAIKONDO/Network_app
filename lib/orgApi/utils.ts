@@ -168,3 +168,48 @@ export function generateUniqueThemeId(): string {
   return `theme_${timestamp}_${randomPart}`;
 }
 
+/**
+ * カテゴリーのユニークIDを生成
+ */
+export function generateUniqueCategoryId(): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 11);
+  return `category_${timestamp}_${randomPart}`;
+}
+
+/**
+ * VCのユニークIDを生成
+ */
+export function generateUniqueVcId(): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 11);
+  return `vc_${timestamp}_${randomPart}`;
+}
+
+/**
+ * 部署のユニークIDを生成
+ */
+export function generateUniqueDepartmentId(): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 11);
+  return `dept_${timestamp}_${randomPart}`;
+}
+
+export function generateUniqueStatusId(): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 11);
+  return `status_${timestamp}_${randomPart}`;
+}
+
+export function generateUniqueEngagementLevelId(): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 11);
+  return `engagement_${timestamp}_${randomPart}`;
+}
+
+export function generateUniqueBizDevPhaseId(): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 11);
+  return `bizdev_${timestamp}_${randomPart}`;
+}
+

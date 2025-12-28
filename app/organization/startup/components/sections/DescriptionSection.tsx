@@ -82,26 +82,39 @@ export default function DescriptionSection({
             ID: {descriptionTextareaId}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           {!isEditingDescription && (
             <button
               onClick={handleOpenAIModal}
               style={{
-                padding: '6px 12px',
-                backgroundColor: '#3B82F6',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: 500,
-                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                padding: 0,
+                backgroundColor: 'transparent',
+                color: '#3B82F6',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                opacity: 0.6,
+                transition: 'all 0.2s ease',
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                e.currentTarget.style.opacity = '1';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.opacity = '0.6';
+              }}
+              title="AIで作文"
             >
-              <span>🤖</span>
-              <span>AIで作文</span>
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+              </svg>
             </button>
           )}
           <button
@@ -109,17 +122,45 @@ export default function DescriptionSection({
               setIsEditingDescription(!isEditingDescription);
             }}
             style={{
-              padding: '6px 12px',
-              backgroundColor: isEditingDescription ? '#10B981' : '#6B7280',
-              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              padding: 0,
+              backgroundColor: isEditingDescription ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+              color: isEditingDescription ? '#10B981' : '#9CA3AF',
               border: 'none',
               borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: 500,
               cursor: 'pointer',
+              opacity: isEditingDescription ? 1 : 0.3,
+              transition: 'all 0.2s ease',
             }}
+            onMouseEnter={(e) => {
+              if (!isEditingDescription) {
+                e.currentTarget.style.backgroundColor = 'rgba(107, 114, 128, 0.08)';
+                e.currentTarget.style.opacity = '0.6';
+                e.currentTarget.style.color = '#6B7280';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isEditingDescription) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.opacity = '0.3';
+                e.currentTarget.style.color = '#9CA3AF';
+              }
+            }}
+            title={isEditingDescription ? '完了' : '編集'}
           >
-            {isEditingDescription ? '✓ 完了' : '✏️ 編集'}
+            {isEditingDescription ? (
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+              </svg>
+            )}
           </button>
         </div>
       </div>

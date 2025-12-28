@@ -18,6 +18,12 @@ const ALLOWED_TABLES: &[&str] = &[
     "regulations", // 制度テーブル
     "startups", // スタートアップテーブル
     "themes",
+    "categories", // カテゴリーテーブル
+    "vcs", // VCテーブル
+    "departments", // 部署テーブル
+    "statuses", // ステータステーブル
+    "engagementLevels", // ねじ込み注力度テーブル
+    "bizDevPhases", // Biz-Devフェーズテーブル
     "topics", // topicEmbeddingsから統合
     "entities",
     "relations", // topicRelationsからリネーム
@@ -77,12 +83,21 @@ pub fn get_doc(collection_name: &str, doc_id: &str) -> SqlResult<HashMap<String,
                            col_name == "formatPattern" ||
                            col_name == "pageRelations" ||
                            col_name == "linkedPlanIds" ||
-                           col_name == "initiativeIds" {
+                           col_name == "initiativeIds" ||
+                           col_name == "themeIds" ||
+                           col_name == "topicIds" ||
+                           col_name == "categoryIds" ||
+                           col_name == "relatedVCS" ||
+                           col_name == "responsibleDepartments" {
                             // JSON文字列をパース、失敗した場合は空のオブジェクト/配列を返す
+                            eprintln!("📖 [get_doc] JSONフィールド '{}' を処理: value={}", col_name, s.chars().take(200).collect::<String>());
                             match serde_json::from_str::<Value>(&s) {
-                                Ok(v) => v,
-                                Err(_) => {
-                                    eprintln!("⚠️ [get_doc] JSONパースエラー: field={}, value={}", col_name, s.chars().take(100).collect::<String>());
+                                Ok(v) => {
+                                    eprintln!("✅ [get_doc] JSONフィールド '{}' パース成功: {:?}", col_name, v);
+                                    v
+                                },
+                                Err(e) => {
+                                    eprintln!("⚠️ [get_doc] JSONパースエラー: field={}, error={}, value={}", col_name, e, s.chars().take(100).collect::<String>());
                                     json!([])
                                 }
                             }
@@ -246,6 +261,9 @@ pub fn set_doc(collection_name: &str, doc_id: &str, data: HashMap<String, Value>
         "initiativeIds", // テーマの注力施策IDリスト
         "themeIds", // 注力施策のテーマIDリスト
         "topicIds", // 注力施策のトピックIDリスト
+        "categoryIds", // スタートアップのカテゴリーIDリスト
+        "relatedVCS", // スタートアップの関連VCリスト
+        "responsibleDepartments", // スタートアップの主管事業部署リスト
         "levels", // テーマ階層設定のレベル配列
     ];
     
@@ -269,6 +287,11 @@ pub fn set_doc(collection_name: &str, doc_id: &str, data: HashMap<String, Value>
                 row_data.insert(field.to_string(), json!(null));
                 eprintln!("📝 [set_doc] JSONフィールド '{}' をNULLに設定", field);
             }
+        } else {
+            // フィールドが存在しない場合でも、JSONフィールドの場合はnullを設定
+            // これにより、データベースにNULLとして保存され、後で読み込む際に正しく処理される
+            row_data.insert(field.to_string(), json!(null));
+            eprintln!("📝 [set_doc] JSONフィールド '{}' が存在しないため、NULLを設定", field);
         }
     }
     
@@ -279,10 +302,19 @@ pub fn set_doc(collection_name: &str, doc_id: &str, data: HashMap<String, Value>
             valid_fields.push(field.clone());
         } else {
             eprintln!("⚠️ [set_doc] カラム '{}' はテーブル '{}' に存在しないためスキップします", field, collection_name);
+            if field == "categoryIds" {
+                eprintln!("❌ [set_doc] categoryIdsカラムがテーブル '{}' に存在しません。マイグレーションが必要です。", collection_name);
+                eprintln!("📋 [set_doc] テーブル '{}' のカラム一覧: {:?}", collection_name, table_columns);
+            }
         }
     }
     
     eprintln!("✅ [set_doc] 有効なフィールド数: {} / {}", valid_fields.len(), row_data.len());
+    if collection_name == "startups" {
+        eprintln!("📋 [set_doc] startupsテーブルのカラム一覧: {:?}", table_columns);
+        eprintln!("📋 [set_doc] categoryIdsがvalid_fieldsに含まれているか: {}", valid_fields.contains(&"categoryIds".to_string()));
+        eprintln!("📋 [set_doc] categoryIdsがrow_dataに含まれているか: {}", row_data.contains_key("categoryIds"));
+    }
     
     // meetingNotes、focusInitiatives、topics、entities、relationsテーブルの場合、外部キー制約を一時的に無効化（古い外部キー制約が残っている可能性があるため）
     if collection_name == "meetingNotes" || collection_name == "focusInitiatives" || collection_name == "topics" || collection_name == "entities" || collection_name == "relations" {
@@ -543,6 +575,9 @@ pub fn update_doc(collection_name: &str, doc_id: &str, data: HashMap<String, Val
         "initiativeIds", // テーマの注力施策IDリスト
         "themeIds", // 注力施策のテーマIDリスト
         "topicIds", // 注力施策のトピックIDリスト
+        "categoryIds", // スタートアップのカテゴリーIDリスト
+        "relatedVCS", // スタートアップの関連VCリスト
+        "responsibleDepartments", // スタートアップの主管事業部署リスト
         "levels", // テーマ階層設定のレベル配列
     ];
     
@@ -566,6 +601,11 @@ pub fn update_doc(collection_name: &str, doc_id: &str, data: HashMap<String, Val
                 row_data.insert(field.to_string(), json!(null));
                 eprintln!("📝 [update_doc] JSONフィールド '{}' をNULLに設定", field);
             }
+        } else {
+            // フィールドが存在しない場合でも、JSONフィールドの場合はnullを設定
+            // これにより、データベースにNULLとして保存され、後で読み込む際に正しく処理される
+            row_data.insert(field.to_string(), json!(null));
+            eprintln!("📝 [update_doc] JSONフィールド '{}' が存在しないため、NULLを設定", field);
         }
     }
     
@@ -1051,12 +1091,21 @@ pub fn get_collection(collection_name: &str, conditions: Option<HashMap<String, 
                            col_name == "formatPattern" ||
                            col_name == "pageRelations" ||
                            col_name == "linkedPlanIds" ||
-                           col_name == "initiativeIds" {
+                           col_name == "initiativeIds" ||
+                           col_name == "themeIds" ||
+                           col_name == "topicIds" ||
+                           col_name == "categoryIds" ||
+                           col_name == "relatedVCS" ||
+                           col_name == "responsibleDepartments" {
                             // JSON文字列をパース、失敗した場合は空のオブジェクト/配列を返す
+                            eprintln!("📖 [get_collection] JSONフィールド '{}' を処理: value={}", col_name, s.chars().take(200).collect::<String>());
                             match serde_json::from_str::<Value>(&s) {
-                                Ok(v) => v,
-                                Err(_) => {
-                                    eprintln!("⚠️ [get_collection] JSONパースエラー: field={}, value={}", col_name, s.chars().take(100).collect::<String>());
+                                Ok(v) => {
+                                    eprintln!("✅ [get_collection] JSONフィールド '{}' パース成功: {:?}", col_name, v);
+                                    v
+                                },
+                                Err(e) => {
+                                    eprintln!("⚠️ [get_collection] JSONパースエラー: field={}, error={}, value={}", col_name, e, s.chars().take(100).collect::<String>());
                                     json!([])
                                 }
                             }

@@ -8,7 +8,7 @@ import RelationsTab from './tabs/RelationsTab';
 import MonetizationTab from './tabs/MonetizationTab';
 import RelationTab from './tabs/RelationTab';
 import type { StartupTab } from './StartupTabBar';
-import type { Startup } from '@/lib/orgApi';
+import type { Startup, Category, VC, Department, Status, EngagementLevel, BizDevPhase } from '@/lib/orgApi';
 
 interface StartupTabContentProps {
   activeTab: StartupTab;
@@ -64,19 +64,35 @@ interface StartupTabContentProps {
   isEditingChart: boolean;
   setIsEditingChart: (editing: boolean) => void;
   // Details Tab
-  methodOptions: string[];
-  localMethod: string[];
-  setLocalMethod: (method: string[] | ((prev: string[]) => string[])) => void;
-  localMethodOther: string;
-  setLocalMethodOther: (methodOther: string) => void;
-  meansOptions: string[];
-  localMeans: string[];
-  setLocalMeans: (means: string[] | ((prev: string[]) => string[])) => void;
-  localMeansOther: string;
-  setLocalMeansOther: (meansOther: string) => void;
   isEditing: boolean;
   editingContent: string;
   setEditingContent: (content: string) => void;
+  localCategory: string[];
+  setLocalCategory: (category: string[]) => void;
+  localStatus: string;
+  setLocalStatus: (status: string) => void;
+  localAgencyContractMonth: string;
+  setLocalAgencyContractMonth: (month: string) => void;
+  localEngagementLevel: string;
+  setLocalEngagementLevel: (level: string) => void;
+  localBizDevPhase: string;
+  setLocalBizDevPhase: (phase: string) => void;
+  localRelatedVCs: string[];
+  setLocalRelatedVCs: (vcs: string[]) => void;
+  localResponsibleDepts: string[];
+  setLocalResponsibleDepts: (depts: string[]) => void;
+  localHpUrl: string;
+  setLocalHpUrl: (url: string) => void;
+  localAsanaUrl: string;
+  setLocalAsanaUrl: (url: string) => void;
+  localBoxUrl: string;
+  setLocalBoxUrl: (url: string) => void;
+  categories: Category[];
+  vcs: VC[];
+  departments: Department[];
+  statuses: Status[];
+  engagementLevels: EngagementLevel[];
+  bizDevPhases: BizDevPhase[];
   // Periods Tab
   localConsiderationPeriod: string;
   setLocalConsiderationPeriod: (period: string) => void;
@@ -160,19 +176,35 @@ export default function StartupTabContent({
   setLocalEvaluationChartSnapshots,
   isEditingChart,
   setIsEditingChart,
-  methodOptions,
-  localMethod,
-  handleMethodToggle,
-  localMethodOther,
-  setLocalMethodOther,
-  meansOptions,
-  localMeans,
-  handleMeansToggle,
-  localMeansOther,
-  setLocalMeansOther,
   isEditing,
   editingContent,
   setEditingContent,
+  localCategory,
+  setLocalCategory,
+  localStatus,
+  setLocalStatus,
+  localAgencyContractMonth,
+  setLocalAgencyContractMonth,
+  localEngagementLevel,
+  setLocalEngagementLevel,
+  localBizDevPhase,
+  setLocalBizDevPhase,
+  localRelatedVCs,
+  setLocalRelatedVCs,
+  localResponsibleDepts,
+  setLocalResponsibleDepts,
+  localHpUrl,
+  setLocalHpUrl,
+  localAsanaUrl,
+  setLocalAsanaUrl,
+  localBoxUrl,
+  setLocalBoxUrl,
+  categories,
+  vcs,
+  departments,
+  statuses,
+  engagementLevels,
+  bizDevPhases,
   localConsiderationPeriod,
   setLocalConsiderationPeriod,
   localExecutionPeriod,
@@ -257,31 +289,35 @@ export default function StartupTabContent({
     case 'details':
       return (
         <DetailsTab
-          methodOptions={methodOptions}
-          localMethod={localMethod}
-          handleMethodToggle={(method: string) => {
-            setLocalMethod(prev => 
-              prev.includes(method) 
-                ? prev.filter(m => m !== method)
-                : [...prev, method]
-            );
-          }}
-          localMethodOther={localMethodOther}
-          setLocalMethodOther={setLocalMethodOther}
-          meansOptions={meansOptions}
-          localMeans={localMeans}
-          handleMeansToggle={(means: string) => {
-            setLocalMeans(prev => 
-              prev.includes(means) 
-                ? prev.filter(m => m !== means)
-                : [...prev, means]
-            );
-          }}
-          localMeansOther={localMeansOther}
-          setLocalMeansOther={setLocalMeansOther}
           isEditing={isEditing}
           editingContent={editingContent}
           setEditingContent={setEditingContent}
+          localCategory={localCategory}
+          setLocalCategory={setLocalCategory}
+          localStatus={localStatus}
+          setLocalStatus={setLocalStatus}
+          localAgencyContractMonth={localAgencyContractMonth}
+          setLocalAgencyContractMonth={setLocalAgencyContractMonth}
+          localEngagementLevel={localEngagementLevel}
+          setLocalEngagementLevel={setLocalEngagementLevel}
+          localBizDevPhase={localBizDevPhase}
+          setLocalBizDevPhase={setLocalBizDevPhase}
+          localRelatedVCs={localRelatedVCs}
+          setLocalRelatedVCs={setLocalRelatedVCs}
+          localResponsibleDepts={localResponsibleDepts}
+          setLocalResponsibleDepts={setLocalResponsibleDepts}
+          localHpUrl={localHpUrl}
+          setLocalHpUrl={setLocalHpUrl}
+          localAsanaUrl={localAsanaUrl}
+          setLocalAsanaUrl={setLocalAsanaUrl}
+          localBoxUrl={localBoxUrl}
+          setLocalBoxUrl={setLocalBoxUrl}
+          categories={categories}
+          vcs={vcs}
+          departments={departments}
+          statuses={statuses}
+          engagementLevels={engagementLevels}
+          bizDevPhases={bizDevPhases}
         />
       );
       

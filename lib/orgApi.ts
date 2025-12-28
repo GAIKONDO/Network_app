@@ -824,6 +824,16 @@ export interface Theme {
   updatedAt?: any;
 }
 
+export interface Category {
+  id: string;
+  title: string;
+  description?: string;
+  parentCategoryId?: string; // 親カテゴリーID（サブカテゴリーの場合）
+  position?: number; // 表示順序
+  createdAt?: any;
+  updatedAt?: any;
+}
+
 /**
  * 注力施策の型定義
  */
@@ -2016,6 +2026,15 @@ export {
   updateThemePositions,
 } from './orgApi/themes';
 
+// カテゴリー関連
+export {
+  getCategories,
+  getCategoryById,
+  saveCategory,
+  deleteCategory,
+  updateCategoryPositions,
+} from './orgApi/categories';
+
 // トピック関連
 export {
   getTopicsByMeetingNote,
@@ -2029,3 +2048,6 @@ export {
   getOrganizationContent,
   saveOrganizationContent,
 } from './orgApi/organizations';
+
+// lib/orgApi/index.tsからすべてを再エクスポート（カテゴリー関連を含む）
+export * from './orgApi/index';

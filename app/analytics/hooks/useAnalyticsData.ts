@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getThemes, getFocusInitiatives, deleteTheme, getAllTopics, type Theme, type FocusInitiative, type TopicInfo } from '@/lib/orgApi';
+import { getThemes, getFocusInitiatives, deleteTheme, getAllTopics, getCategories, getAllStartups, getVcs, getDepartments, getStatuses, getEngagementLevels, getBizDevPhases, type Theme, type FocusInitiative, type TopicInfo, type Category, type Startup, type VC, type Department, type Status, type EngagementLevel, type BizDevPhase } from '@/lib/orgApi';
 import { getOrgTreeFromDb, type OrgNodeData } from '@/lib/orgApi';
 import { devLog, devWarn } from '../utils/devLog';
 
 export function useAnalyticsData() {
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vcs, setVcs] = useState<VC[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [engagementLevels, setEngagementLevels] = useState<EngagementLevel[]>([]);
+  const [bizDevPhases, setBizDevPhases] = useState<BizDevPhase[]>([]);
+  const [startups, setStartups] = useState<Startup[]>([]);
   const [initiatives, setInitiatives] = useState<FocusInitiative[]>([]);
   const [orgData, setOrgData] = useState<OrgNodeData | null>(null);
   const [topics, setTopics] = useState<TopicInfo[]>([]);
@@ -17,6 +24,60 @@ export function useAnalyticsData() {
       setThemes(refreshedThemes);
     } catch (error: any) {
       console.error('テーマリストの再読み込みに失敗しました:', error);
+    }
+  }, []);
+
+  const refreshCategories = useCallback(async () => {
+    try {
+      const refreshedCategories = await getCategories();
+      setCategories(refreshedCategories);
+    } catch (error: any) {
+      console.error('カテゴリーリストの再読み込みに失敗しました:', error);
+    }
+  }, []);
+
+  const refreshVcs = useCallback(async () => {
+    try {
+      const refreshedVcs = await getVcs();
+      setVcs(refreshedVcs);
+    } catch (error: any) {
+      console.error('VCリストの再読み込みに失敗しました:', error);
+    }
+  }, []);
+
+  const refreshDepartments = useCallback(async () => {
+    try {
+      const refreshedDepartments = await getDepartments();
+      setDepartments(refreshedDepartments);
+    } catch (error: any) {
+      console.error('部署リストの再読み込みに失敗しました:', error);
+    }
+  }, []);
+
+  const refreshStatuses = useCallback(async () => {
+    try {
+      const refreshedStatuses = await getStatuses();
+      setStatuses(refreshedStatuses);
+    } catch (error: any) {
+      console.error('ステータスリストの再読み込みに失敗しました:', error);
+    }
+  }, []);
+
+  const refreshEngagementLevels = useCallback(async () => {
+    try {
+      const refreshedEngagementLevels = await getEngagementLevels();
+      setEngagementLevels(refreshedEngagementLevels);
+    } catch (error: any) {
+      console.error('ねじ込み注力度リストの再読み込みに失敗しました:', error);
+    }
+  }, []);
+
+  const refreshBizDevPhases = useCallback(async () => {
+    try {
+      const refreshedBizDevPhases = await getBizDevPhases();
+      setBizDevPhases(refreshedBizDevPhases);
+    } catch (error: any) {
+      console.error('Biz-Devフェーズリストの再読み込みに失敗しました:', error);
     }
   }, []);
 
@@ -93,9 +154,44 @@ export function useAnalyticsData() {
         
         devLog('📖 最終的なテーマ数:', themesData.length);
         
+        devLog('📖 カテゴリーを読み込み中...');
+        const categoriesData = await getCategories();
+        devLog('📖 読み込んだカテゴリー数:', categoriesData.length);
+        
+        devLog('📖 スタートアップを読み込み中...');
+        const startupsData = await getAllStartups();
+        devLog('📖 読み込んだスタートアップ数:', startupsData.length);
+        
+        devLog('📖 VCを読み込み中...');
+        const vcsData = await getVcs();
+        devLog('📖 読み込んだVC数:', vcsData.length);
+        
+        devLog('📖 部署を読み込み中...');
+        const departmentsData = await getDepartments();
+        devLog('📖 読み込んだ部署数:', departmentsData.length);
+        
+        devLog('📖 ステータスを読み込み中...');
+        const statusesData = await getStatuses();
+        devLog('📖 読み込んだステータス数:', statusesData.length);
+        
+        devLog('📖 ねじ込み注力度を読み込み中...');
+        const engagementLevelsData = await getEngagementLevels();
+        devLog('📖 読み込んだねじ込み注力度数:', engagementLevelsData.length);
+        
+        devLog('📖 Biz-Devフェーズを読み込み中...');
+        const bizDevPhasesData = await getBizDevPhases();
+        devLog('📖 読み込んだBiz-Devフェーズ数:', bizDevPhasesData.length);
+        
         const orgTree = await getOrgTreeFromDb();
         
         setThemes(themesData);
+        setCategories(categoriesData);
+        setStartups(startupsData);
+        setVcs(vcsData);
+        setDepartments(departmentsData);
+        setStatuses(statusesData);
+        setEngagementLevels(engagementLevelsData);
+        setBizDevPhases(bizDevPhasesData);
         setOrgData(orgTree);
         
         if (typeof window !== 'undefined') {
@@ -162,6 +258,20 @@ export function useAnalyticsData() {
   return {
     themes,
     setThemes,
+    categories,
+    setCategories,
+    vcs,
+    setVcs,
+    departments,
+    setDepartments,
+    statuses,
+    setStatuses,
+    engagementLevels,
+    setEngagementLevels,
+    bizDevPhases,
+    setBizDevPhases,
+    startups,
+    setStartups,
     initiatives,
     orgData,
     topics,
@@ -169,6 +279,12 @@ export function useAnalyticsData() {
     loading,
     error,
     refreshThemes,
+    refreshCategories,
+    refreshVcs,
+    refreshDepartments,
+    refreshStatuses,
+    refreshEngagementLevels,
+    refreshBizDevPhases,
     refreshTopics,
   };
 }

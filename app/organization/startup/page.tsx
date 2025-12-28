@@ -31,6 +31,12 @@ function StartupDetailPageContent() {
     startup,
     orgData,
     themes,
+    categories,
+    vcs,
+    departments,
+    statuses,
+    engagementLevels,
+    bizDevPhases,
     topics,
     orgMembers,
     allOrgMembers,
@@ -43,6 +49,7 @@ function StartupDetailPageContent() {
     setStartup,
     setOrgData,
     setThemes,
+    setCategories,
     setTopics,
     setOrgMembers,
     setAllOrgMembers,
@@ -82,6 +89,16 @@ function StartupDetailPageContent() {
   const [savingStatus, setSavingStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [localThemeIds, setLocalThemeIds] = useState<string[]>(initialLocalState.themeIds);
   const [localTopicIds, setLocalTopicIds] = useState<string[]>(initialLocalState.topicIds);
+  const [localCategory, setLocalCategory] = useState<string[]>(initialLocalState.categoryIds || []);
+  const [localRelatedVCs, setLocalRelatedVCs] = useState<string[]>(initialLocalState.relatedVCS || []);
+  const [localResponsibleDepts, setLocalResponsibleDepts] = useState<string[]>(initialLocalState.responsibleDepartments || []);
+  const [localStatus, setLocalStatus] = useState<string>(initialLocalState.status || '');
+  const [localAgencyContractMonth, setLocalAgencyContractMonth] = useState<string>(initialLocalState.agencyContractMonth || '');
+  const [localEngagementLevel, setLocalEngagementLevel] = useState<string>(initialLocalState.engagementLevel || '');
+  const [localBizDevPhase, setLocalBizDevPhase] = useState<string>(initialLocalState.bizDevPhase || '');
+  const [localHpUrl, setLocalHpUrl] = useState<string>(initialLocalState.hpUrl || '');
+  const [localAsanaUrl, setLocalAsanaUrl] = useState<string>(initialLocalState.asanaUrl || '');
+  const [localBoxUrl, setLocalBoxUrl] = useState<string>(initialLocalState.boxUrl || '');
   const [isTopicsExpanded, setIsTopicsExpanded] = useState(false);
   const [isTopicSelectModalOpen, setIsTopicSelectModalOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -94,6 +111,15 @@ function StartupDetailPageContent() {
   const assigneeDropdownRef = useRef<HTMLDivElement>(null);
   
   // initialLocalStateが更新されたらローカル状態を更新
+  // ただし、categoryIdsは初回ロード時またはcategoryIdsが実際に変更された場合のみ更新
+  const prevCategoryIdsRef = useRef<string[]>([]);
+  const prevStatusRef = useRef<string>('');
+  const prevEngagementLevelRef = useRef<string>('');
+  const prevBizDevPhaseRef = useRef<string>('');
+  const prevAgencyContractMonthRef = useRef<string>('');
+  const prevHpUrlRef = useRef<string>('');
+  const prevAsanaUrlRef = useRef<string>('');
+  const prevBoxUrlRef = useRef<string>('');
   useEffect(() => {
     setEditingContent(initialLocalState.content || '');
     setLocalAssignee(initialLocalState.assignee);
@@ -124,6 +150,102 @@ function StartupDetailPageContent() {
     setLocalCauseEffectCode(initialLocalState.causeEffectCode);
     setLocalThemeIds(initialLocalState.themeIds);
     setLocalTopicIds(initialLocalState.topicIds);
+    
+    // categoryIdsは初回ロード時またはcategoryIdsが実際に変更された場合のみ更新
+    const currentCategoryIds = initialLocalState.categoryIds || [];
+    const prevCategoryIds = prevCategoryIdsRef.current;
+    const categoryIdsChanged = JSON.stringify(currentCategoryIds) !== JSON.stringify(prevCategoryIds);
+    const isInitialLoad = prevCategoryIds.length === 0 && currentCategoryIds.length > 0;
+    const shouldUpdateCategory = isInitialLoad || (categoryIdsChanged && currentCategoryIds.length > 0);
+    
+    if (shouldUpdateCategory) {
+      console.log('🔄 [page] categoryIds更新:', {
+        isInitialLoad,
+        categoryIdsChanged,
+        currentCategoryIds,
+        prevCategoryIds,
+      });
+      setLocalCategory(currentCategoryIds);
+      prevCategoryIdsRef.current = currentCategoryIds;
+    } else {
+      console.log('⏭️ [page] categoryIdsの更新をスキップ:', {
+        isInitialLoad,
+        categoryIdsChanged,
+        currentCategoryIds,
+        prevCategoryIds,
+      });
+    }
+    
+    // relatedVCSとresponsibleDepartmentsも同様に初期化
+    setLocalRelatedVCs(initialLocalState.relatedVCS || []);
+    setLocalResponsibleDepts(initialLocalState.responsibleDepartments || []);
+    
+    // status, engagementLevel, bizDevPhaseは初回ロード時または実際に変更された場合のみ更新
+    const currentStatus = initialLocalState.status || '';
+    const currentEngagementLevel = initialLocalState.engagementLevel || '';
+    const currentBizDevPhase = initialLocalState.bizDevPhase || '';
+    const currentAgencyContractMonth = initialLocalState.agencyContractMonth || '';
+    const currentHpUrl = initialLocalState.hpUrl || '';
+    const currentAsanaUrl = initialLocalState.asanaUrl || '';
+    const currentBoxUrl = initialLocalState.boxUrl || '';
+    
+    const prevStatus = prevStatusRef.current;
+    const prevEngagementLevel = prevEngagementLevelRef.current;
+    const prevBizDevPhase = prevBizDevPhaseRef.current;
+    const prevAgencyContractMonth = prevAgencyContractMonthRef.current;
+    const prevHpUrl = prevHpUrlRef.current;
+    const prevAsanaUrl = prevAsanaUrlRef.current;
+    const prevBoxUrl = prevBoxUrlRef.current;
+    
+    // 初回ロード時（前の値が空で、新しい値が存在する場合）または値が実際に変更された場合のみ更新
+    const isInitialStatusLoad = !prevStatus && currentStatus;
+    const isStatusChanged = prevStatus !== currentStatus && currentStatus;
+    if (isInitialStatusLoad || isStatusChanged) {
+      setLocalStatus(currentStatus);
+      prevStatusRef.current = currentStatus;
+    }
+    
+    const isInitialEngagementLevelLoad = !prevEngagementLevel && currentEngagementLevel;
+    const isEngagementLevelChanged = prevEngagementLevel !== currentEngagementLevel && currentEngagementLevel;
+    if (isInitialEngagementLevelLoad || isEngagementLevelChanged) {
+      setLocalEngagementLevel(currentEngagementLevel);
+      prevEngagementLevelRef.current = currentEngagementLevel;
+    }
+    
+    const isInitialBizDevPhaseLoad = !prevBizDevPhase && currentBizDevPhase;
+    const isBizDevPhaseChanged = prevBizDevPhase !== currentBizDevPhase && currentBizDevPhase;
+    if (isInitialBizDevPhaseLoad || isBizDevPhaseChanged) {
+      setLocalBizDevPhase(currentBizDevPhase);
+      prevBizDevPhaseRef.current = currentBizDevPhase;
+    }
+    
+    const isInitialAgencyContractMonthLoad = !prevAgencyContractMonth && currentAgencyContractMonth;
+    const isAgencyContractMonthChanged = prevAgencyContractMonth !== currentAgencyContractMonth && currentAgencyContractMonth;
+    if (isInitialAgencyContractMonthLoad || isAgencyContractMonthChanged) {
+      setLocalAgencyContractMonth(currentAgencyContractMonth);
+      prevAgencyContractMonthRef.current = currentAgencyContractMonth;
+    }
+    
+    const isInitialHpUrlLoad = !prevHpUrl && currentHpUrl;
+    const isHpUrlChanged = prevHpUrl !== currentHpUrl && currentHpUrl;
+    if (isInitialHpUrlLoad || isHpUrlChanged) {
+      setLocalHpUrl(currentHpUrl);
+      prevHpUrlRef.current = currentHpUrl;
+    }
+    
+    const isInitialAsanaUrlLoad = !prevAsanaUrl && currentAsanaUrl;
+    const isAsanaUrlChanged = prevAsanaUrl !== currentAsanaUrl && currentAsanaUrl;
+    if (isInitialAsanaUrlLoad || isAsanaUrlChanged) {
+      setLocalAsanaUrl(currentAsanaUrl);
+      prevAsanaUrlRef.current = currentAsanaUrl;
+    }
+    
+    const isInitialBoxUrlLoad = !prevBoxUrl && currentBoxUrl;
+    const isBoxUrlChanged = prevBoxUrl !== currentBoxUrl && currentBoxUrl;
+    if (isInitialBoxUrlLoad || isBoxUrlChanged) {
+      setLocalBoxUrl(currentBoxUrl);
+      prevBoxUrlRef.current = currentBoxUrl;
+    }
   }, [initialLocalState]);
   
   // AI作文モーダル関連
@@ -171,6 +293,16 @@ function StartupDetailPageContent() {
     localCauseEffectCode,
     localThemeIds,
     localTopicIds,
+    localCategory,
+    localRelatedVCs,
+    localResponsibleDepts,
+    localStatus,
+    localAgencyContractMonth,
+    localEngagementLevel,
+    localBizDevPhase,
+    localHpUrl,
+    localAsanaUrl,
+    localBoxUrl,
     setStartup,
     setEditingContent,
     setLocalAssignee,
@@ -192,12 +324,20 @@ function StartupDetailPageContent() {
     setLocalRelationDiagram,
     setLocalThemeIds,
     setLocalTopicIds,
+    setLocalCategory,
+    setLocalRelatedVCs,
+    setLocalResponsibleDepts,
+    setLocalStatus,
+    setLocalAgencyContractMonth,
+    setLocalEngagementLevel,
+    setLocalBizDevPhase,
+    setLocalHpUrl,
+    setLocalAsanaUrl,
+    setLocalBoxUrl,
     setSavingStatus,
   });
-  
-  // 選択肢のマスターデータ（デフォルト値）
-  const [methodOptions] = useState(['協業・連携', 'ベンチャー投資', '一般投資', '投資・関連会社化', '投資・子会社化', '投資・完全子会社化', 'JV設立', '組織再編', '人材育成', '新会社設立', 'その他']);
-  const [meansOptions] = useState(['技術開発', '事業開発', 'マーケティング', '営業', 'その他']);
+
+  // 選択肢はデータベースから取得（categories, vcs, departments, statuses, engagementLevels, bizDevPhases）
 
   
   // 担当者ドロップダウンの外側クリックで閉じる
@@ -337,19 +477,35 @@ function StartupDetailPageContent() {
           setLocalEvaluationChartSnapshots={setLocalEvaluationChartSnapshots}
           isEditingChart={isEditingChart}
           setIsEditingChart={setIsEditingChart}
-          methodOptions={methodOptions}
-          localMethod={localMethod}
-          setLocalMethod={setLocalMethod}
-          localMethodOther={localMethodOther}
-          setLocalMethodOther={setLocalMethodOther}
-          meansOptions={meansOptions}
-          localMeans={localMeans}
-          setLocalMeans={setLocalMeans}
-          localMeansOther={localMeansOther}
-          setLocalMeansOther={setLocalMeansOther}
           isEditing={isEditing}
           editingContent={editingContent}
           setEditingContent={setEditingContent}
+          localCategory={localCategory}
+          setLocalCategory={setLocalCategory}
+          localStatus={localStatus}
+          setLocalStatus={setLocalStatus}
+          localAgencyContractMonth={localAgencyContractMonth}
+          setLocalAgencyContractMonth={setLocalAgencyContractMonth}
+          localEngagementLevel={localEngagementLevel}
+          setLocalEngagementLevel={setLocalEngagementLevel}
+          localBizDevPhase={localBizDevPhase}
+          setLocalBizDevPhase={setLocalBizDevPhase}
+          localRelatedVCs={localRelatedVCs}
+          setLocalRelatedVCs={setLocalRelatedVCs}
+          localResponsibleDepts={localResponsibleDepts}
+          setLocalResponsibleDepts={setLocalResponsibleDepts}
+          localHpUrl={localHpUrl}
+          setLocalHpUrl={setLocalHpUrl}
+          localAsanaUrl={localAsanaUrl}
+          setLocalAsanaUrl={setLocalAsanaUrl}
+          localBoxUrl={localBoxUrl}
+          setLocalBoxUrl={setLocalBoxUrl}
+          categories={categories}
+          vcs={vcs}
+          departments={departments}
+          statuses={statuses}
+          engagementLevels={engagementLevels}
+          bizDevPhases={bizDevPhases}
           localConsiderationPeriod={localConsiderationPeriod}
           setLocalConsiderationPeriod={setLocalConsiderationPeriod}
           localExecutionPeriod={localExecutionPeriod}

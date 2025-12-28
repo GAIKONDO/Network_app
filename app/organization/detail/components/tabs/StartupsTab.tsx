@@ -128,49 +128,67 @@ export default function StartupsTab({
               }}
               style={{
                 padding: '16px',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: '#ffffff',
                 border: '1px solid #E5E7EB',
                 borderRadius: '8px',
+                transition: 'all 0.2s ease',
                 cursor: editingStartupId !== startup.id ? 'pointer' : 'default',
-                transition: 'all 150ms',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
               }}
               onMouseEnter={(e) => {
                 if (editingStartupId !== startup.id) {
-                  e.currentTarget.style.borderColor = '#10B981';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.borderColor = '#3B82F6';
+                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (editingStartupId !== startup.id) {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#E5E7EB';
-                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }
               }}
             >
               {editingStartupId === startup.id ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>
                   <input
                     type="text"
                     value={editingStartupTitle}
                     onChange={(e) => setEditingStartupTitle(e.target.value)}
-                    style={{
-                      padding: '8px',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                    }}
                     autoFocus
+                    disabled={savingStartup}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '2px solid #3B82F6',
+                      borderRadius: '6px',
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      marginBottom: '8px',
+                      backgroundColor: savingStartup ? '#F3F4F6' : '#FFFFFF',
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        onSaveEdit(startup.id);
+                      } else if (e.key === 'Escape') {
+                        onCancelEdit();
+                      }
+                    }}
                   />
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                     <button
-                      onClick={() => onCancelEdit()}
+                      onClick={onCancelEdit}
+                      disabled={savingStartup}
                       style={{
-                        padding: '4px 12px',
-                        backgroundColor: '#F3F4F6',
-                        color: '#374151',
+                        padding: '6px 12px',
+                        backgroundColor: '#6B7280',
+                        color: 'white',
                         border: 'none',
                         borderRadius: '4px',
-                        cursor: 'pointer',
+                        cursor: savingStartup ? 'not-allowed' : 'pointer',
                         fontSize: '12px',
                       }}
                     >
@@ -180,8 +198,8 @@ export default function StartupsTab({
                       onClick={() => onSaveEdit(startup.id)}
                       disabled={savingStartup || !editingStartupTitle.trim()}
                       style={{
-                        padding: '4px 12px',
-                        backgroundColor: savingStartup || !editingStartupTitle.trim() ? '#D1D5DB' : '#10B981',
+                        padding: '6px 12px',
+                        backgroundColor: savingStartup || !editingStartupTitle.trim() ? '#9CA3AF' : '#10B981',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
@@ -196,78 +214,117 @@ export default function StartupsTab({
               ) : (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <h4
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: '600',
+                    <h4 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (organizationId && startup.id) {
+                          router.push(`/organization/startup?organizationId=${organizationId}&startupId=${startup.id}`);
+                        }
+                      }}
+                      style={{ 
+                        fontSize: '16px', 
+                        fontWeight: 600, 
                         color: 'var(--color-text)',
-                        margin: 0,
+                        cursor: 'pointer',
                         flex: 1,
                       }}
                     >
                       {startup.title}
                     </h4>
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                    <div style={{ display: 'flex', gap: '2px', marginLeft: '8px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onStartEdit(startup);
                         }}
+                        disabled={savingStartup}
                         style={{
-                          padding: '4px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '24px',
+                          height: '24px',
+                          padding: 0,
                           backgroundColor: 'transparent',
+                          color: '#9CA3AF',
                           border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          color: '#6B7280',
+                          borderRadius: '4px',
+                          cursor: savingStartup ? 'not-allowed' : 'pointer',
+                          opacity: 0.3,
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!savingStartup) {
+                            e.currentTarget.style.backgroundColor = 'rgba(107, 114, 128, 0.08)';
+                            e.currentTarget.style.opacity = '0.6';
+                            e.currentTarget.style.color = '#6B7280';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!savingStartup) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.opacity = '0.3';
+                            e.currentTarget.style.color = '#9CA3AF';
+                          }
                         }}
                         title="編集"
                       >
-                        ✏️
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onDelete(startup.id);
                         }}
+                        disabled={savingStartup}
                         style={{
-                          padding: '4px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '24px',
+                          height: '24px',
+                          padding: 0,
                           backgroundColor: 'transparent',
+                          color: '#9CA3AF',
                           border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          color: '#EF4444',
+                          borderRadius: '4px',
+                          cursor: savingStartup ? 'not-allowed' : 'pointer',
+                          opacity: 0.3,
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!savingStartup) {
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+                            e.currentTarget.style.opacity = '0.6';
+                            e.currentTarget.style.color = '#9CA3AF';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!savingStartup) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.opacity = '0.3';
+                            e.currentTarget.style.color = '#9CA3AF';
+                          }
                         }}
                         title="削除"
                       >
-                        🗑️
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ display: 'block' }}>
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
                       </button>
                     </div>
                   </div>
                   {startup.description && (
-                    <p
-                      style={{
-                        fontSize: '12px',
-                        color: 'var(--color-text-light)',
-                        margin: 0,
-                        marginTop: '8px',
-                        lineHeight: '1.5',
-                      }}
-                    >
+                    <p style={{ fontSize: '14px', color: 'var(--color-text-light)', marginBottom: '8px', lineHeight: '1.5' }}>
                       {startup.description}
                     </p>
                   )}
-                  {startup.id && (
-                    <p
-                      style={{
-                        fontSize: '10px',
-                        color: '#9CA3AF',
-                        margin: 0,
-                        marginTop: '8px',
-                      }}
-                    >
-                      ID: {startup.id}
-                    </p>
+                  {startup.createdAt && (
+                    <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>
+                      作成日: {new Date(startup.createdAt).toLocaleDateString('ja-JP')}
+                    </div>
                   )}
                 </>
               )}

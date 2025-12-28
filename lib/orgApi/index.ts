@@ -12,6 +12,12 @@ export {
   generateUniqueRegulationId,
   generateUniqueStartupId,
   generateUniqueThemeId,
+  generateUniqueCategoryId,
+  generateUniqueVcId,
+  generateUniqueDepartmentId,
+  generateUniqueStatusId,
+  generateUniqueEngagementLevelId,
+  generateUniqueBizDevPhaseId,
 } from './utils';
 
 // 各機能モジュールから関数を再エクスポート
@@ -71,6 +77,7 @@ export {
 // スタートアップ関連
 export {
   getStartups,
+  getAllStartups,
   saveStartup,
   getStartupById,
   deleteStartup,
@@ -84,6 +91,58 @@ export {
   deleteTheme,
   updateThemePositions,
 } from './themes';
+
+// カテゴリー関連
+export {
+  getCategories,
+  getCategoryById,
+  saveCategory,
+  deleteCategory,
+  updateCategoryPositions,
+} from './categories';
+
+// VC関連
+export {
+  getVcs,
+  saveVc,
+  deleteVc,
+  updateVcPositions,
+} from './vcs';
+
+// 部署関連
+export {
+  getDepartments,
+  saveDepartment,
+  deleteDepartment,
+  updateDepartmentPositions,
+} from './departments';
+
+// ステータス関連
+export {
+  getStatuses,
+  getStatusById,
+  saveStatus,
+  deleteStatus,
+  updateStatusPositions,
+} from './statuses';
+
+// ねじ込み注力度関連
+export {
+  getEngagementLevels,
+  getEngagementLevelById,
+  saveEngagementLevel,
+  deleteEngagementLevel,
+  updateEngagementLevelPositions,
+} from './engagementLevels';
+
+// Biz-Devフェーズ関連
+export {
+  getBizDevPhases,
+  getBizDevPhaseById,
+  saveBizDevPhase,
+  deleteBizDevPhase,
+  updateBizDevPhasePositions,
+} from './bizDevPhases';
 
 // トピック関連
 export {

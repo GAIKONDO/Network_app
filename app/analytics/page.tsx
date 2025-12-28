@@ -7,8 +7,9 @@ import { AnalyticsTabBar } from './components/TabBar';
 import { RelationshipDiagramTab } from './components/RelationshipDiagramTab';
 import { A2C100Tab } from './components/A2C100Tab';
 import { PlaceholderTab } from './components/PlaceholderTab';
+import { CategoryManagementTab } from './components/CategoryManagementTab';
 
-type AnalyticsTab = 'relationship-diagram' | 'a2c100' | 'tab3' | 'tab4';
+type AnalyticsTab = 'relationship-diagram' | 'a2c100' | 'category-management' | 'tab4';
 
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('relationship-diagram');
@@ -19,6 +20,20 @@ export default function AnalyticsPage() {
   const {
     themes,
     setThemes,
+    categories,
+    setCategories,
+    vcs,
+    setVcs,
+    departments,
+    setDepartments,
+    statuses,
+    setStatuses,
+    engagementLevels,
+    setEngagementLevels,
+    bizDevPhases,
+    setBizDevPhases,
+    startups,
+    setStartups,
     initiatives,
     orgData,
     topics,
@@ -26,6 +41,12 @@ export default function AnalyticsPage() {
     loading,
     error,
     refreshThemes,
+    refreshCategories,
+    refreshVcs,
+    refreshDepartments,
+    refreshStatuses,
+    refreshEngagementLevels,
+    refreshBizDevPhases,
     refreshTopics,
   } = useAnalyticsData();
 
@@ -98,8 +119,28 @@ export default function AnalyticsPage() {
           <A2C100Tab />
         )}
 
-        {activeTab === 'tab3' && (
-          <PlaceholderTab tabName="機能3" />
+        {activeTab === 'category-management' && (
+          <CategoryManagementTab
+            categories={categories}
+            setCategories={setCategories}
+            vcs={vcs}
+            setVcs={setVcs}
+            departments={departments}
+            setDepartments={setDepartments}
+            statuses={statuses}
+            setStatuses={setStatuses}
+            engagementLevels={engagementLevels}
+            setEngagementLevels={setEngagementLevels}
+            bizDevPhases={bizDevPhases}
+            setBizDevPhases={setBizDevPhases}
+            startups={startups}
+            refreshCategories={refreshCategories}
+            refreshVcs={refreshVcs}
+            refreshDepartments={refreshDepartments}
+            refreshStatuses={refreshStatuses}
+            refreshEngagementLevels={refreshEngagementLevels}
+            refreshBizDevPhases={refreshBizDevPhases}
+          />
         )}
 
         {activeTab === 'tab4' && (

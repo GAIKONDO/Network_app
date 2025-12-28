@@ -30,6 +30,79 @@ export interface Theme {
 }
 
 /**
+ * カテゴリーの型定義
+ */
+export interface Category {
+  id: string;
+  title: string;
+  description?: string;
+  parentCategoryId?: string; // 親カテゴリーID（サブカテゴリーの場合）
+  position?: number; // 表示順序
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/**
+ * VC（ベンチャーキャピタル）の型定義
+ */
+export interface VC {
+  id: string;
+  title: string;
+  description?: string;
+  position?: number; // 表示順序
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/**
+ * 部署の型定義
+ */
+export interface Department {
+  id: string;
+  title: string;
+  description?: string;
+  position?: number; // 表示順序
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/**
+ * ステータスの型定義
+ */
+export interface Status {
+  id: string;
+  title: string;
+  description?: string;
+  position?: number; // 表示順序
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/**
+ * ねじ込み注力度の型定義
+ */
+export interface EngagementLevel {
+  id: string;
+  title: string;
+  description?: string;
+  position?: number; // 表示順序
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/**
+ * Biz-Devフェーズの型定義
+ */
+export interface BizDevPhase {
+  id: string;
+  title: string;
+  description?: string;
+  position?: number; // 表示順序
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/**
  * 注力施策の型定義
  */
 export interface FocusInitiative {
@@ -149,6 +222,16 @@ export interface Startup {
   themeId?: string; // 関連するテーマID（後方互換性のため残す）
   themeIds?: string[]; // 関連するテーマIDの配列（複数のテーマにリンク可能）
   topicIds?: string[]; // 関連する個別トピックIDの配列（複数のトピックにリンク可能）
+  categoryIds?: string[]; // 関連するカテゴリーIDの配列（複数選択可能）
+  relatedVCS?: string[]; // 関連VCの配列（複数選択可能）
+  responsibleDepartments?: string[]; // 主管事業部署の配列（複数選択可能）
+  status?: string; // ステータスID
+  agencyContractMonth?: string; // 代理店契約締結月
+  engagementLevel?: string; // ねじ込み注力度ID
+  bizDevPhase?: string; // Biz-DevフェーズID
+  hpUrl?: string; // HP URL
+  asanaUrl?: string; // Asana URL
+  boxUrl?: string; // Box URL
   createdAt?: any;
   updatedAt?: any;
 }
