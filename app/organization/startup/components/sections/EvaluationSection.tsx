@@ -321,6 +321,18 @@ export default function EvaluationSection({
                 isEditing={isEditingChart}
                 onEdit={() => setIsEditingChart(true)}
                 onSave={() => {}}
+                onScoreChange={(axisId: string, score: number) => {
+                  if (localEvaluationChart && localEvaluationChart.axes) {
+                    const updatedAxes = localEvaluationChart.axes.map(axis => 
+                      axis.id === axisId ? { ...axis, score: Math.max(0, Math.min(score, axis.maxValue || 5)) } : axis
+                    );
+                    setLocalEvaluationChart({
+                      ...localEvaluationChart,
+                      axes: updatedAxes,
+                      updatedAt: new Date().toISOString(),
+                    });
+                  }
+                }}
               />
               <EvaluationDetailTable chartData={localEvaluationChart} />
             </>

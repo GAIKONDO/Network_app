@@ -341,17 +341,17 @@ export function StatusSection({
             </div>
           </div>
 
-          <div style={{
-            padding: '40px',
-            textAlign: 'center',
-            backgroundColor: '#F9FAFB',
-            border: '1px solid #E5E7EB',
-            borderRadius: '8px',
-            color: '#6B7280',
-            fontSize: '14px',
-            fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          }}>
-            ステータス関係性図は準備中です。
+        <div style={{
+          padding: '40px',
+          textAlign: 'center',
+          backgroundColor: '#F9FAFB',
+          border: '1px solid #E5E7EB',
+          borderRadius: '8px',
+          color: '#6B7280',
+          fontSize: '14px',
+          fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        }}>
+          ステータス関係性図は準備中です。
           </div>
         </div>
       )}

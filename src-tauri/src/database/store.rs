@@ -24,6 +24,7 @@ const ALLOWED_TABLES: &[&str] = &[
     "statuses", // ステータステーブル
     "engagementLevels", // ねじ込み注力度テーブル
     "bizDevPhases", // Biz-Devフェーズテーブル
+    "categoryBizDevPhaseSnapshots", // カテゴリー・Biz-Devフェーズスナップショットテーブル
     "topics", // topicEmbeddingsから統合
     "entities",
     "relations", // topicRelationsからリネーム
@@ -265,6 +266,10 @@ pub fn set_doc(collection_name: &str, doc_id: &str, data: HashMap<String, Value>
         "relatedVCS", // スタートアップの関連VCリスト
         "responsibleDepartments", // スタートアップの主管事業部署リスト
         "levels", // テーマ階層設定のレベル配列
+        "evaluationChart", // スタートアップの評価チャート
+        "evaluationChartSnapshots", // スタートアップの評価チャートスナップショット
+        "competitorComparison", // スタートアップの競合比較データ
+        "deepSearch", // スタートアップのDeepsearchデータ
     ];
     
     // INTEGER型のフィールドのリスト

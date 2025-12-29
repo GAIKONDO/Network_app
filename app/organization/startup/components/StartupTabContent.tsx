@@ -3,6 +3,8 @@
 import React from 'react';
 import OverviewTab from './tabs/OverviewTab';
 import DetailsTab from './tabs/DetailsTab';
+import DeepsearchTab from './tabs/DeepsearchTab';
+import CompetitorComparisonTab from './tabs/CompetitorComparisonTab';
 import PeriodsTab from './tabs/PeriodsTab';
 import RelationsTab from './tabs/RelationsTab';
 import MonetizationTab from './tabs/MonetizationTab';
@@ -318,6 +320,24 @@ export default function StartupTabContent({
           statuses={statuses}
           engagementLevels={engagementLevels}
           bizDevPhases={bizDevPhases}
+        />
+      );
+      
+    case 'deepsearch':
+      return (
+        <DeepsearchTab
+          startup={startup}
+          organizationId={organizationId}
+          setStartup={setStartup}
+        />
+      );
+      
+    case 'competitor-comparison':
+      return (
+        <CompetitorComparisonTab
+          startup={startup}
+          organizationId={organizationId}
+          setStartup={setStartup}
         />
       );
       

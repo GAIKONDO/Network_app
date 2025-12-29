@@ -78,18 +78,44 @@ const VegaChart = memo(function VegaChart({ spec, language = 'vega-lite', title,
           
           // クリックイベントのリスナーを追加
           if (onSignal) {
+            // Vega-Liteのselectionシグナルを監視
+            try {
+              // clicked_themeシグナルを監視
+              viewRef.current.addSignalListener('clicked_theme', (name: string, value: any) => {
+                console.log('VegaChart clicked_theme signal:', name, value);
+                if (value && typeof value === 'object') {
+                  // selectionの値からデータを取得
+                  if (value.datum) {
+                    onSignal('clicked_theme', { datum: value.datum, ...value.datum });
+                  } else {
+                    onSignal('clicked_theme', value);
+                  }
+                }
+              });
+            } catch (e) {
+              console.log('Failed to add signal listener, using click event:', e);
+            }
+            
             // Vega-Liteのviewに直接クリックイベントを追加
             try {
               // Vega-LiteのviewのaddEventListenerを使用（推奨方法）
               viewRef.current.addEventListener('click', (event: any, item: any) => {
                 try {
                   if (item && item.datum) {
-                    // クリックされたデータからテーマIDまたはカテゴリーIDを取得
+                    // クリックされたデータからテーマID、カテゴリーID、VC IDを取得
                     const themeId = item.datum.themeId;
                     const categoryId = item.datum.categoryId;
                     const category = item.datum.category;
                     const subCategoryId = item.datum.subCategoryId;
                     const subCategory = item.datum.subCategory;
+                    const vcId = item.datum.vcId;
+                    const vc = item.datum.vc;
+                    const departmentId = item.datum.departmentId;
+                    const department = item.datum.department;
+                    const bizDevPhaseId = item.datum.bizDevPhaseId;
+                    const bizDevPhase = item.datum.bizDevPhase;
+                    const parentCategoryId = item.datum.parentCategoryId;
+                    const parentCategory = item.datum.parentCategory;
                     
                     if (themeId) {
                       onSignal('clicked_theme', { themeId, datum: item.datum });
@@ -97,11 +123,32 @@ const VegaChart = memo(function VegaChart({ spec, language = 'vega-lite', title,
                     } else if (subCategoryId) {
                       onSignal('clicked_theme', { subCategoryId, subCategory, categoryId, category, datum: item.datum });
                       return;
+                    } else if (categoryId && bizDevPhaseId) {
+                      // サブカテゴリー × Biz-Devフェーズの場合
+                      onSignal('clicked_theme', { categoryId, category, bizDevPhaseId, bizDevPhase, datum: item.datum });
+                      return;
                     } else if (categoryId) {
                       onSignal('clicked_theme', { categoryId, category, datum: item.datum });
                       return;
                     } else if (category) {
                       onSignal('clicked_theme', { category, datum: item.datum });
+                      return;
+                    } else if (parentCategoryId && bizDevPhaseId) {
+                      // 親カテゴリー × Biz-Devフェーズの場合
+                      onSignal('clicked_theme', { parentCategoryId, parentCategory, bizDevPhaseId, bizDevPhase, datum: item.datum });
+                      return;
+                    } else if (departmentId && bizDevPhaseId) {
+                      // 主管事業部署 × Biz-Devフェーズの場合
+                      onSignal('clicked_theme', { departmentId, department, bizDevPhaseId, bizDevPhase, datum: item.datum });
+                      return;
+                    } else if (vcId && bizDevPhaseId) {
+                      onSignal('clicked_theme', { vcId, vc, bizDevPhaseId, bizDevPhase, datum: item.datum });
+                      return;
+                    } else if (vcId) {
+                      onSignal('clicked_theme', { vcId, vc, datum: item.datum });
+                      return;
+                    } else if (vc) {
+                      onSignal('clicked_theme', { vc, datum: item.datum });
                       return;
                     }
                   }
@@ -170,6 +217,21 @@ const VegaChart = memo(function VegaChart({ spec, language = 'vega-lite', title,
                             } else if (datum.category) {
                               onSignal('clicked_theme', { category: datum.category, datum });
                               return;
+                            } else if (datum.parentCategoryId && datum.bizDevPhaseId) {
+                              onSignal('clicked_theme', { parentCategoryId: datum.parentCategoryId, parentCategory: datum.parentCategory, bizDevPhaseId: datum.bizDevPhaseId, bizDevPhase: datum.bizDevPhase, datum });
+                              return;
+                            } else if (datum.departmentId && datum.bizDevPhaseId) {
+                              onSignal('clicked_theme', { departmentId: datum.departmentId, department: datum.department, bizDevPhaseId: datum.bizDevPhaseId, bizDevPhase: datum.bizDevPhase, datum });
+                              return;
+                            } else if (datum.vcId && datum.bizDevPhaseId) {
+                              onSignal('clicked_theme', { vcId: datum.vcId, vc: datum.vc, bizDevPhaseId: datum.bizDevPhaseId, bizDevPhase: datum.bizDevPhase, datum });
+                              return;
+                            } else if (datum.vcId) {
+                              onSignal('clicked_theme', { vcId: datum.vcId, vc: datum.vc, datum });
+                              return;
+                            } else if (datum.vc) {
+                              onSignal('clicked_theme', { vc: datum.vc, datum });
+                            return;
                             }
                           }
                         }
@@ -190,10 +252,11 @@ const VegaChart = memo(function VegaChart({ spec, language = 'vega-lite', title,
                           
                           if (clickedTheme !== undefined && clickedTheme !== null) {
                             const themeName = String(clickedTheme);
-                            // テーマまたはカテゴリーのデータを検索
+                            // テーマ、カテゴリー、またはVCのデータを検索
                             const themeData = chartData.find((d: any) => d.theme === themeName);
                             const categoryData = chartData.find((d: any) => d.category === themeName);
-                            const data = themeData || categoryData;
+                            const vcData = chartData.find((d: any) => d.vc === themeName);
+                            const data = themeData || categoryData || vcData;
                             
                             if (data) {
                               if (data.themeId) {
@@ -207,6 +270,21 @@ const VegaChart = memo(function VegaChart({ spec, language = 'vega-lite', title,
                                 return;
                               } else if (data.category) {
                                 onSignal('clicked_theme', { category: data.category, datum: data });
+                                return;
+                            } else if (data.parentCategoryId && data.bizDevPhaseId) {
+                              onSignal('clicked_theme', { parentCategoryId: data.parentCategoryId, parentCategory: data.parentCategory, bizDevPhaseId: data.bizDevPhaseId, bizDevPhase: data.bizDevPhase, datum: data });
+                              return;
+                            } else if (data.departmentId && data.bizDevPhaseId) {
+                              onSignal('clicked_theme', { departmentId: data.departmentId, department: data.department, bizDevPhaseId: data.bizDevPhaseId, bizDevPhase: data.bizDevPhase, datum: data });
+                              return;
+                            } else if (data.vcId && data.bizDevPhaseId) {
+                              onSignal('clicked_theme', { vcId: data.vcId, vc: data.vc, bizDevPhaseId: data.bizDevPhaseId, bizDevPhase: data.bizDevPhase, datum: data });
+                              return;
+                            } else if (data.vcId) {
+                                onSignal('clicked_theme', { vcId: data.vcId, vc: data.vc, datum: data });
+                                return;
+                              } else if (data.vc) {
+                                onSignal('clicked_theme', { vc: data.vc, datum: data });
                                 return;
                               }
                             }
@@ -231,10 +309,11 @@ const VegaChart = memo(function VegaChart({ spec, language = 'vega-lite', title,
                         
                         if (clickedThemeIndex >= 0 && clickedThemeIndex < uniqueThemes.length) {
                           const clickedTheme = uniqueThemes[clickedThemeIndex];
-                          // テーマまたはカテゴリーのデータを検索
+                          // テーマ、カテゴリー、またはVCのデータを検索
                           const themeData = chartData.find((d: any) => d.theme === clickedTheme);
                           const categoryData = chartData.find((d: any) => d.category === clickedTheme);
-                          const data = themeData || categoryData;
+                          const vcData = chartData.find((d: any) => d.vc === clickedTheme);
+                          const data = themeData || categoryData || vcData;
                           
                           if (data) {
                             if (data.themeId) {
@@ -243,6 +322,14 @@ const VegaChart = memo(function VegaChart({ spec, language = 'vega-lite', title,
                               onSignal('clicked_theme', { categoryId: data.categoryId, category: data.category, datum: data });
                             } else if (data.category) {
                               onSignal('clicked_theme', { category: data.category, datum: data });
+                            } else if (data.departmentId && data.bizDevPhaseId) {
+                              onSignal('clicked_theme', { departmentId: data.departmentId, department: data.department, bizDevPhaseId: data.bizDevPhaseId, bizDevPhase: data.bizDevPhase, datum: data });
+                            } else if (data.vcId && data.bizDevPhaseId) {
+                              onSignal('clicked_theme', { vcId: data.vcId, vc: data.vc, bizDevPhaseId: data.bizDevPhaseId, bizDevPhase: data.bizDevPhase, datum: data });
+                            } else if (data.vcId) {
+                              onSignal('clicked_theme', { vcId: data.vcId, vc: data.vc, datum: data });
+                            } else if (data.vc) {
+                              onSignal('clicked_theme', { vc: data.vc, datum: data });
                             }
                           }
                         }

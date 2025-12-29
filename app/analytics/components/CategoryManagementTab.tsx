@@ -157,6 +157,8 @@ export function CategoryManagementTab({
           categories={categories}
           setCategories={setCategories}
           startups={startups}
+          bizDevPhases={bizDevPhases}
+          orderedBizDevPhases={bizDevPhaseManagement.orderedBizDevPhases}
           categoryManagement={categoryManagement}
         />
       )}
@@ -166,6 +168,8 @@ export function CategoryManagementTab({
           vcs={vcs}
           setVcs={setVcs}
           startups={startups}
+          bizDevPhases={bizDevPhases}
+          orderedBizDevPhases={bizDevPhaseManagement.orderedBizDevPhases}
           vcManagement={vcManagement}
         />
       )}
@@ -175,6 +179,8 @@ export function CategoryManagementTab({
           departments={departments}
           setDepartments={setDepartments}
           startups={startups}
+          bizDevPhases={bizDevPhases}
+          orderedBizDevPhases={bizDevPhaseManagement.orderedBizDevPhases}
           departmentManagement={departmentManagement}
         />
       )}

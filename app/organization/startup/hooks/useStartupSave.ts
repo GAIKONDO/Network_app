@@ -240,6 +240,10 @@ export function useStartupSave({
       hpUrl: localHpUrl || undefined,
       asanaUrl: localAsanaUrl || undefined,
       boxUrl: localBoxUrl || undefined,
+      // competitorComparisonを保持（競合比較タブで保存されたデータを維持）
+      competitorComparison: startup.competitorComparison || undefined,
+      // deepSearchを保持（Deepsearchタブで保存されたデータを維持）
+      deepSearch: startup.deepSearch || undefined,
       // 特性要因図のコードからデータを更新
       ...(() => {
         try {
@@ -305,6 +309,14 @@ export function useStartupSave({
         ...startup,
         ...dataToSave,
       } as Startup;
+      
+      devLog('💾 [handleManualSave] updatedStartup確認:', {
+        hasCompetitorComparison: !!updatedStartup.competitorComparison,
+        competitorComparisonId: updatedStartup.competitorComparison?.id,
+        competitorComparisonAxesCount: updatedStartup.competitorComparison?.axes?.length || 0,
+        dataToSaveHasCompetitorComparison: !!dataToSave.competitorComparison,
+        startupHasCompetitorComparison: !!startup.competitorComparison,
+      });
       
       setStartup(updatedStartup);
       

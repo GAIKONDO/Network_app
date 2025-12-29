@@ -158,6 +158,8 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
       hpUrl: startup.hpUrl || undefined,
       asanaUrl: startup.asanaUrl || undefined,
       boxUrl: startup.boxUrl || undefined,
+      competitorComparison: startup.competitorComparison || undefined,
+      deepSearch: startup.deepSearch || undefined,
       updatedAt: now,
     };
     
@@ -252,7 +254,21 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
           responsibleDepartments: Array.isArray(data.responsibleDepartments) ? (data.responsibleDepartments.length > 0 ? JSON.stringify(data.responsibleDepartments) : '[]') : '[]',
           evaluationChart: data.evaluationChart ? JSON.stringify(data.evaluationChart) : null,
           evaluationChartSnapshots: Array.isArray(data.evaluationChartSnapshots) && data.evaluationChartSnapshots.length > 0 ? JSON.stringify(data.evaluationChartSnapshots) : null,
-        };
+      competitorComparison: data.competitorComparison ? JSON.stringify(data.competitorComparison) : null,
+      deepSearch: data.deepSearch ? JSON.stringify(data.deepSearch) : null,
+    };
+        
+        // dataForDb構築直後にcompetitorComparisonを確認
+        console.log('💾 [saveStartup] dataForDb構築直後確認:', {
+          hasCompetitorComparisonInData: !!data.competitorComparison,
+          competitorComparisonInData: data.competitorComparison,
+          competitorComparisonInDataId: data.competitorComparison?.id,
+          hasCompetitorComparisonInDataForDb: 'competitorComparison' in dataForDb,
+          competitorComparisonInDataForDb: dataForDb.competitorComparison,
+          competitorComparisonInDataForDbType: typeof dataForDb.competitorComparison,
+          competitorComparisonInDataForDbIsNull: dataForDb.competitorComparison === null,
+          competitorComparisonInDataForDbIsUndefined: dataForDb.competitorComparison === undefined,
+        });
         
         console.log('💾 [saveStartup] dataForDb確認:', {
           hasEvaluationChart: !!dataForDb.evaluationChart,
@@ -279,6 +295,11 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
           responsibleDepartmentsType: typeof dataForDb.responsibleDepartments,
           responsibleDepartmentsValue: data.responsibleDepartments,
           responsibleDepartmentsValueLength: Array.isArray(data.responsibleDepartments) ? data.responsibleDepartments.length : 0,
+          hasCompetitorComparison: 'competitorComparison' in dataForDb,
+          competitorComparison: dataForDb.competitorComparison,
+          competitorComparisonType: typeof dataForDb.competitorComparison,
+          competitorComparisonValue: data.competitorComparison,
+          competitorComparisonValueId: data.competitorComparison?.id,
         });
         
         await callTauriCommand('doc_set', {
@@ -289,7 +310,13 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
         
         console.log('💾 [saveStartup] doc_set呼び出し後:', {
           dataForDbKeys: Object.keys(dataForDb),
+          dataForDbKeysCount: Object.keys(dataForDb).length,
           evaluationChartInDataForDb: 'evaluationChart' in dataForDb,
+          competitorComparisonInDataForDb: 'competitorComparison' in dataForDb,
+          competitorComparisonValue: dataForDb.competitorComparison,
+          competitorComparisonType: typeof dataForDb.competitorComparison,
+          competitorComparisonValueLength: typeof dataForDb.competitorComparison === 'string' ? dataForDb.competitorComparison.length : 'N/A',
+          competitorComparisonValuePreview: typeof dataForDb.competitorComparison === 'string' ? dataForDb.competitorComparison.substring(0, 200) : dataForDb.competitorComparison,
         });
         console.log('✅ [saveStartup] データベース保存成功（Tauri）:', startupId, {
           title: data.title,
@@ -312,6 +339,11 @@ export async function saveStartup(startup: Partial<Startup>): Promise<string> {
           responsibleDepartments: data.responsibleDepartments,
           responsibleDepartmentsLength: Array.isArray(data.responsibleDepartments) ? data.responsibleDepartments.length : 0,
           responsibleDepartmentsInDataForDb: dataForDb.responsibleDepartments,
+          hasCompetitorComparison: !!data.competitorComparison,
+          competitorComparisonId: data.competitorComparison?.id,
+          competitorComparisonAxesCount: data.competitorComparison?.axes?.length || 0,
+          competitorComparisonInDataForDb: dataForDb.competitorComparison,
+          competitorComparisonInDataForDbType: typeof dataForDb.competitorComparison,
         });
       } else {
         await setDoc(docRef, data);
@@ -363,6 +395,9 @@ export async function getStartupById(startupId: string): Promise<Startup | null>
       if (result && result.exists) {
         const data = result.data || result;
         
+        const allDataKeys = Object.keys(data);
+        const hasCompetitorComparisonInData = 'competitorComparison' in data;
+        const competitorComparisonInAllDataKeys = allDataKeys.includes('competitorComparison');
         console.log('📖 [getStartupById] 生データ確認:', {
           hasEvaluationChart: !!data.evaluationChart,
           evaluationChartType: typeof data.evaluationChart,
@@ -370,12 +405,28 @@ export async function getStartupById(startupId: string): Promise<Startup | null>
           evaluationChartLength: typeof data.evaluationChart === 'string' ? data.evaluationChart.length : 'N/A',
           hasEvaluationChartSnapshots: !!data.evaluationChartSnapshots,
           evaluationChartSnapshotsType: typeof data.evaluationChartSnapshots,
-          allDataKeys: Object.keys(data),
+          allDataKeys,
+          allDataKeysCount: allDataKeys.length,
+          allDataKeysString: allDataKeys.join(', '),
+          hasCompetitorComparisonInData,
+          competitorComparisonInAllDataKeys,
           hasCategoryIds: 'categoryIds' in data,
           categoryIds: data.categoryIds,
           categoryIdsType: typeof data.categoryIds,
           categoryIdsValue: data.categoryIds ? (typeof data.categoryIds === 'string' ? data.categoryIds.substring(0, 200) : JSON.stringify(data.categoryIds).substring(0, 200)) : null,
           categoryIdsLength: typeof data.categoryIds === 'string' ? data.categoryIds.length : (Array.isArray(data.categoryIds) ? data.categoryIds.length : 'N/A'),
+          competitorComparison: data.competitorComparison,
+          competitorComparisonType: typeof data.competitorComparison,
+          competitorComparisonValue: data.competitorComparison ? (typeof data.competitorComparison === 'string' ? data.competitorComparison.substring(0, 200) : JSON.stringify(data.competitorComparison).substring(0, 200)) : null,
+          competitorComparisonLength: typeof data.competitorComparison === 'string' ? data.competitorComparison.length : (typeof data.competitorComparison === 'object' ? 'object' : 'N/A'),
+        });
+        console.log('📖 [getStartupById] allDataKeys詳細:', allDataKeys);
+        console.log('📖 [getStartupById] competitorComparison存在確認:', {
+          hasCompetitorComparisonInData,
+          competitorComparisonInData: data.competitorComparison,
+          competitorComparisonType: typeof data.competitorComparison,
+          competitorComparisonIsNull: data.competitorComparison === null,
+          competitorComparisonIsUndefined: data.competitorComparison === undefined,
         });
         
         const parseJsonArray = (value: any, fieldName: string = 'unknown'): string[] => {
@@ -475,6 +526,57 @@ export async function getStartupById(startupId: string): Promise<Startup | null>
           hpUrl: data.hpUrl,
           asanaUrl: data.asanaUrl,
           boxUrl: data.boxUrl,
+          competitorComparison: (() => {
+            console.log('📖 [getStartupById] competitorComparisonパース開始:', {
+              hasCompetitorComparison: 'competitorComparison' in data,
+              competitorComparison: data.competitorComparison,
+              competitorComparisonType: typeof data.competitorComparison,
+              competitorComparisonIsNull: data.competitorComparison === null,
+              competitorComparisonIsUndefined: data.competitorComparison === undefined,
+            });
+            if (!data.competitorComparison) {
+              console.log('📖 [getStartupById] competitorComparison: null/undefinedのためundefinedを返す');
+              return undefined;
+            }
+            if (typeof data.competitorComparison === 'object' && !Array.isArray(data.competitorComparison)) {
+              console.log('📖 [getStartupById] competitorComparison: 既にオブジェクト', {
+                id: (data.competitorComparison as any)?.id,
+                axesCount: (data.competitorComparison as any)?.axes?.length || 0,
+              });
+              return data.competitorComparison as any;
+            }
+            if (typeof data.competitorComparison === 'string') {
+              try {
+                const parsed = JSON.parse(data.competitorComparison);
+                console.log('📖 [getStartupById] competitorComparison JSONパース成功:', {
+                  id: parsed?.id,
+                  axesCount: parsed?.axes?.length || 0,
+                  selectedStartupsCount: parsed?.selectedStartupIds?.length || 0,
+                });
+                return parsed;
+              } catch (e) {
+                console.warn('⚠️ [getStartupById] competitorComparison JSONパースエラー:', e, 'value:', data.competitorComparison);
+                return undefined;
+              }
+            }
+            console.log('📖 [getStartupById] competitorComparison: その他の型', typeof data.competitorComparison, data.competitorComparison);
+            return undefined;
+          })(),
+          deepSearch: (() => {
+            if (!data.deepSearch) return undefined;
+            if (typeof data.deepSearch === 'object' && !Array.isArray(data.deepSearch)) {
+              return data.deepSearch as any;
+            }
+            if (typeof data.deepSearch === 'string') {
+              try {
+                return JSON.parse(data.deepSearch);
+              } catch (e) {
+                console.warn('⚠️ [getStartupById] deepSearch JSONパースエラー:', e);
+                return undefined;
+              }
+            }
+            return undefined;
+          })(),
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         };
@@ -506,6 +608,11 @@ export async function getStartupById(startupId: string): Promise<Startup | null>
           rawStatus: data.status,
           rawEngagementLevel: data.engagementLevel,
           rawBizDevPhase: data.bizDevPhase,
+          hasCompetitorComparison: !!startup.competitorComparison,
+          competitorComparisonId: startup.competitorComparison?.id,
+          competitorComparisonAxesCount: startup.competitorComparison?.axes?.length || 0,
+          rawCompetitorComparisonType: typeof data.competitorComparison,
+          rawCompetitorComparisonExists: 'competitorComparison' in data,
         });
         
         return startup;
@@ -649,6 +756,36 @@ export async function getAllStartups(): Promise<Startup[]> {
           themeId: data.themeId,
           themeIds: parseJsonArray(data.themeIds),
           topicIds: parseJsonArray(data.topicIds),
+          competitorComparison: (() => {
+            if (!data.competitorComparison) return undefined;
+            if (typeof data.competitorComparison === 'object' && !Array.isArray(data.competitorComparison)) {
+              return data.competitorComparison as any;
+            }
+            if (typeof data.competitorComparison === 'string') {
+              try {
+                return JSON.parse(data.competitorComparison);
+              } catch (e) {
+                console.warn('⚠️ [getAllStartups] competitorComparison JSONパースエラー:', e);
+                return undefined;
+              }
+            }
+            return undefined;
+          })(),
+          deepSearch: (() => {
+            if (!data.deepSearch) return undefined;
+            if (typeof data.deepSearch === 'object' && !Array.isArray(data.deepSearch)) {
+              return data.deepSearch as any;
+            }
+            if (typeof data.deepSearch === 'string') {
+              try {
+                return JSON.parse(data.deepSearch);
+              } catch (e) {
+                console.warn('⚠️ [getAllStartups] deepSearch JSONパースエラー:', e);
+                return undefined;
+              }
+            }
+            return undefined;
+          })(),
           createdAt: createdAt,
           updatedAt: updatedAt,
         } as Startup;

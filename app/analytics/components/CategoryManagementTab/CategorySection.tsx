@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Category, Startup } from '@/lib/orgApi';
+import type { Category, Startup, BizDevPhase } from '@/lib/orgApi';
 import { useCategoryManagement } from '../../hooks/useCategoryManagement';
 import { useCategoryStartupDiagramData } from '../../hooks/useCategoryStartupDiagramData';
 import ViewModeSelector from '../ViewModeSelector';
@@ -42,6 +42,8 @@ interface CategorySectionProps {
   categories: Category[];
   setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
   startups: Startup[];
+  bizDevPhases: BizDevPhase[];
+  orderedBizDevPhases: BizDevPhase[];
   categoryManagement: ReturnType<typeof useCategoryManagement>;
 }
 
@@ -49,14 +51,19 @@ export function CategorySection({
   categories,
   setCategories,
   startups,
+  bizDevPhases,
+  orderedBizDevPhases,
   categoryManagement,
 }: CategorySectionProps) {
   const router = useRouter();
   const [categorySubTab, setCategorySubTab] = useState<'management' | 'diagram'>('diagram');
-  const [viewMode, setViewMode] = useState<'diagram' | 'bubble' | 'bar'>('bar');
+  const [viewMode, setViewMode] = useState<'diagram' | 'bubble' | 'bar' | 'matrix'>('matrix');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedBarCategoryId, setSelectedBarCategoryId] = useState<string | null>(null);
+  const [selectedMatrixCell, setSelectedMatrixCell] = useState<{ parentCategoryId: string; bizDevPhaseId: string } | null>(null);
+  const [matrixXAxisMode, setMatrixXAxisMode] = useState<'parent' | 'sub'>('parent');
+  const [barXAxisMode, setBarXAxisMode] = useState<'parent' | 'sub'>('parent');
   
   const { nodes, links } = useCategoryStartupDiagramData({
     categories,
@@ -64,83 +71,408 @@ export function CategorySection({
     selectedCategoryIds,
   });
 
-  // カテゴリーごとのスタートアップ件数を集計（サブカテゴリーごとに分ける）
+  // カテゴリーごとのスタートアップ件数を集計（横軸モードに応じて）
   const categoryChartData = useMemo(() => {
-    // 表示対象のカテゴリーを決定
-    let targetCategories: Category[] = [];
-    
-    if (selectedCategoryIds.length === 0) {
-      // 選択されていない場合は、すべての親カテゴリーを表示
-      targetCategories = categories.filter(cat => !cat.parentCategoryId);
-    } else {
-      // 選択されたカテゴリーとその親カテゴリーを取得
-      const selectedCategories = categories.filter(cat => selectedCategoryIds.includes(cat.id));
-      const getTopLevelCategory = (category: Category): Category => {
-        if (!category.parentCategoryId) {
-          return category;
-        }
-        const parent = categories.find(c => c.id === category.parentCategoryId);
-        if (!parent) {
-          return category;
-        }
-        return getTopLevelCategory(parent);
-      };
+    if (barXAxisMode === 'parent') {
+      // 親カテゴリー × スタートアップ件数（積み上げなし）
+      let targetCategories: Category[] = [];
       
-      const topLevelCats = selectedCategories
-        .map(cat => getTopLevelCategory(cat))
-        .filter((cat, index, self) => self.findIndex(c => c.id === cat.id) === index);
-      
-      targetCategories = topLevelCats;
-    }
+      if (selectedCategoryIds.length === 0) {
+        targetCategories = categories.filter(cat => !cat.parentCategoryId);
+      } else {
+        const selectedCategories = categories.filter(cat => selectedCategoryIds.includes(cat.id));
+        const getTopLevelCategory = (category: Category): Category => {
+          if (!category.parentCategoryId) {
+            return category;
+          }
+          const parent = categories.find(c => c.id === category.parentCategoryId);
+          if (!parent) {
+            return category;
+          }
+          return getTopLevelCategory(parent);
+        };
+        
+        const topLevelCats = selectedCategories
+          .map(cat => getTopLevelCategory(cat))
+          .filter((cat, index, self) => self.findIndex(c => c.id === cat.id) === index);
+        
+        targetCategories = topLevelCats;
+      }
 
-    // 親カテゴリーごとに、サブカテゴリー（または親カテゴリーに直接紐づくもの）ごとの件数を集計
-    const chartData: Array<{
-      category: string;
-      categoryId: string;
-      subCategory: string;
-      subCategoryId: string;
-      count: number;
-    }> = [];
+      const chartData: Array<{
+        category: string;
+        categoryId: string;
+        count: number;
+      }> = [];
 
-    targetCategories.forEach(parentCategory => {
-      // 親カテゴリーに直接紐づくスタートアップを取得
-      const directStartups = startups.filter(startup => 
-        startup.categoryIds && startup.categoryIds.includes(parentCategory.id)
-      );
-      
-      if (directStartups.length > 0) {
+      targetCategories.forEach(parentCategory => {
+        // 親カテゴリーまたはその子カテゴリーに紐づくスタートアップを取得
+        const childCategoryIds = categories
+          .filter(c => c.parentCategoryId === parentCategory.id)
+          .map(c => c.id);
+        const allCategoryIds = [parentCategory.id, ...childCategoryIds];
+        
+        const matchingStartups = startups.filter(startup => 
+          startup.categoryIds && startup.categoryIds.some(catId => allCategoryIds.includes(catId))
+        );
+        
         chartData.push({
           category: parentCategory.title,
           categoryId: parentCategory.id,
-          subCategory: parentCategory.title, // 親カテゴリー自体もサブカテゴリーとして表示
-          subCategoryId: parentCategory.id,
-          count: directStartups.length,
+          count: matchingStartups.length,
+        });
+      });
+
+      return chartData.filter(item => item.count > 0 || selectedCategoryIds.length === 0);
+    } else {
+      // サブカテゴリー × スタートアップ件数
+      let targetSubCategories: Category[] = [];
+      
+      if (selectedCategoryIds.length === 0) {
+        targetSubCategories = categories.filter(cat => cat.parentCategoryId);
+      } else {
+        targetSubCategories = categories.filter(cat => 
+          selectedCategoryIds.includes(cat.id) && cat.parentCategoryId
+        );
+      }
+
+      const chartData: Array<{
+        category: string;
+        categoryId: string;
+        count: number;
+      }> = [];
+
+      targetSubCategories.forEach(subCategory => {
+        const matchingStartups = startups.filter(startup => 
+          startup.categoryIds && startup.categoryIds.includes(subCategory.id)
+        );
+        
+        chartData.push({
+          category: subCategory.title,
+          categoryId: subCategory.id,
+          count: matchingStartups.length,
+        });
+      });
+
+      return chartData.filter(item => item.count > 0 || selectedCategoryIds.length === 0);
+    }
+  }, [categories, startups, selectedCategoryIds, barXAxisMode]);
+
+  // マトリクスデータを生成（親カテゴリー × Biz-Devフェーズ または サブカテゴリー × Biz-Devフェーズ）
+  // orderedBizDevPhasesとorderedCategoriesの順序を使用（管理タブの順序に合わせる）
+  const matrixData = useMemo(() => {
+    // orderedBizDevPhasesが空の場合はbizDevPhasesを使用（フォールバック）
+    const phasesToUse = orderedBizDevPhases.length > 0 ? orderedBizDevPhases : bizDevPhases;
+    // orderedCategoriesが空の場合はcategoriesを使用（フォールバック）
+    const orderedCategoriesToUse = categoryManagement.orderedCategories.length > 0 ? categoryManagement.orderedCategories : categories;
+
+    if (matrixXAxisMode === 'parent') {
+      // 親カテゴリー × Biz-Devフェーズ
+      // 表示対象の親カテゴリーを決定
+      let parentCategories: Category[] = [];
+      
+      if (selectedCategoryIds.length === 0) {
+        // 選択されていない場合は、すべての親カテゴリーを表示（orderedCategoriesの順序を使用）
+        parentCategories = orderedCategoriesToUse.filter(cat => !cat.parentCategoryId);
+      } else {
+        // 選択されたカテゴリーとその親カテゴリーを取得
+        const selectedCategories = orderedCategoriesToUse.filter(cat => selectedCategoryIds.includes(cat.id));
+        const getTopLevelCategory = (category: Category): Category => {
+          if (!category.parentCategoryId) {
+            return category;
+          }
+          const parent = orderedCategoriesToUse.find(c => c.id === category.parentCategoryId);
+          if (!parent) {
+            return category;
+          }
+          return getTopLevelCategory(parent);
+        };
+        
+        const topLevelCats = selectedCategories
+          .map(cat => getTopLevelCategory(cat))
+          .filter((cat, index, self) => self.findIndex(c => c.id === cat.id) === index);
+        
+        // orderedCategoriesの順序を保持
+        parentCategories = topLevelCats.sort((a, b) => {
+          const indexA = orderedCategoriesToUse.findIndex(c => c.id === a.id);
+          const indexB = orderedCategoriesToUse.findIndex(c => c.id === b.id);
+          return indexA - indexB;
         });
       }
 
-      // 子カテゴリー（サブカテゴリー）を取得
-      const childCategories = categories.filter(c => c.parentCategoryId === parentCategory.id);
-      
-      childCategories.forEach(childCategory => {
-        // サブカテゴリーに紐づくスタートアップを取得（重複を除去）
-        const childStartups = startups.filter(startup => 
-          startup.categoryIds && startup.categoryIds.includes(childCategory.id)
-        );
-        
-        if (childStartups.length > 0) {
-          chartData.push({
+      // マトリクスデータを生成
+      const data: Array<{
+        category: string;
+        categoryId: string;
+        parentCategory?: string;
+        parentCategoryId?: string;
+        bizDevPhase: string;
+        bizDevPhaseId: string;
+        bizDevPhasePosition: number;
+        count: number;
+      }> = [];
+
+      parentCategories.forEach(parentCategory => {
+        phasesToUse.forEach((phase, index) => {
+          // 親カテゴリーまたはその子カテゴリーに紐づくスタートアップで、かつ該当するBiz-Devフェーズのものを取得
+          const childCategoryIds = orderedCategoriesToUse
+            .filter(c => c.parentCategoryId === parentCategory.id)
+            .map(c => c.id);
+          const allCategoryIds = [parentCategory.id, ...childCategoryIds];
+          
+          const matchingStartups = startups.filter(startup => 
+            startup.categoryIds && 
+            startup.categoryIds.some(catId => allCategoryIds.includes(catId)) &&
+            (startup as any).bizDevPhase === phase.id
+          );
+          
+          data.push({
             category: parentCategory.title,
             categoryId: parentCategory.id,
-            subCategory: childCategory.title,
-            subCategoryId: childCategory.id,
-            count: childStartups.length,
+            parentCategory: parentCategory.title,
+            parentCategoryId: parentCategory.id,
+            bizDevPhase: phase.title,
+            bizDevPhaseId: phase.id,
+            bizDevPhasePosition: index,
+            count: matchingStartups.length,
           });
-        }
+        });
       });
-    });
 
-    return chartData.filter(item => item.count > 0 || selectedCategoryIds.length === 0);
-  }, [categories, startups, selectedCategoryIds]);
+      return data;
+    } else {
+      // サブカテゴリー × Biz-Devフェーズ
+      // 表示対象のサブカテゴリーを決定
+      let subCategories: Category[] = [];
+      
+      if (selectedCategoryIds.length === 0) {
+        // 選択されていない場合は、すべてのサブカテゴリーを表示（orderedCategoriesの順序を使用）
+        subCategories = orderedCategoriesToUse.filter(cat => cat.parentCategoryId);
+      } else {
+        // 選択されたカテゴリーからサブカテゴリーのみを取得（orderedCategoriesの順序を使用）
+        subCategories = orderedCategoriesToUse.filter(cat => 
+          selectedCategoryIds.includes(cat.id) && cat.parentCategoryId
+        );
+      }
+
+      // マトリクスデータを生成
+      const data: Array<{
+        category: string;
+        categoryId: string;
+        parentCategory?: string;
+        parentCategoryId?: string;
+        bizDevPhase: string;
+        bizDevPhaseId: string;
+        bizDevPhasePosition: number;
+        count: number;
+      }> = [];
+
+      subCategories.forEach(subCategory => {
+        const parentCategory = orderedCategoriesToUse.find(c => c.id === subCategory.parentCategoryId);
+        phasesToUse.forEach((phase, index) => {
+          // サブカテゴリーに紐づくスタートアップで、かつ該当するBiz-Devフェーズのものを取得
+          const matchingStartups = startups.filter(startup => 
+            startup.categoryIds && 
+            startup.categoryIds.includes(subCategory.id) &&
+            (startup as any).bizDevPhase === phase.id
+          );
+          
+          data.push({
+            category: subCategory.title,
+            categoryId: subCategory.id,
+            parentCategory: parentCategory?.title,
+            parentCategoryId: parentCategory?.id,
+            bizDevPhase: phase.title,
+            bizDevPhaseId: phase.id,
+            bizDevPhasePosition: index,
+            count: matchingStartups.length,
+          });
+        });
+      });
+
+      return data;
+    }
+  }, [categories, startups, selectedCategoryIds, bizDevPhases, orderedBizDevPhases, categoryManagement.orderedCategories, matrixXAxisMode]);
+
+  // マトリクスチャートの仕様を生成
+  const matrixChartSpec = useMemo(() => {
+    if (matrixData.length === 0) return null;
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    
+    // orderedBizDevPhasesが空の場合はbizDevPhasesを使用（フォールバック）
+    const phasesToUse = orderedBizDevPhases.length > 0 ? orderedBizDevPhases : bizDevPhases;
+    const chartHeight = isMobile ? 400 : Math.max(400, phasesToUse.length * 40 + 100);
+
+    // カテゴリーの順序を取得（orderedCategoriesの順序を使用）
+    const orderedCategoriesToUse = categoryManagement.orderedCategories.length > 0 ? categoryManagement.orderedCategories : categories;
+    const categoryList = matrixXAxisMode === 'parent'
+      ? Array.from(new Set(matrixData.map(d => d.parentCategoryId)))
+          .map(id => orderedCategoriesToUse.find(c => c.id === id))
+          .filter((c): c is Category => c !== undefined)
+          .sort((a, b) => {
+            const indexA = orderedCategoriesToUse.findIndex(c => c.id === a.id);
+            const indexB = orderedCategoriesToUse.findIndex(c => c.id === b.id);
+            return indexA - indexB;
+          })
+      : Array.from(new Set(matrixData.map(d => d.categoryId)))
+          .map(id => orderedCategoriesToUse.find(c => c.id === id))
+          .filter((c): c is Category => c !== undefined)
+          .sort((a, b) => {
+            const indexA = orderedCategoriesToUse.findIndex(c => c.id === a.id);
+            const indexB = orderedCategoriesToUse.findIndex(c => c.id === b.id);
+            return indexA - indexB;
+          });
+
+    return {
+      $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
+      description: 'カテゴリー × Biz-Devフェーズ マトリクス',
+      width: 'container',
+      height: chartHeight,
+      padding: { top: 20, right: 20, bottom: 60, left: 120 },
+      data: {
+        values: matrixData,
+      },
+      layer: [
+        // 1. 背景のrect（ヒートマップ）
+        {
+          mark: {
+            type: 'rect',
+            tooltip: true,
+            cursor: 'pointer',
+            stroke: '#FFFFFF',
+            strokeWidth: 2,
+          },
+          encoding: {
+            x: {
+              field: 'category',
+              type: 'ordinal',
+              title: matrixXAxisMode === 'parent' ? '親カテゴリー' : 'サブカテゴリー',
+              scale: {
+                domain: categoryList.map(c => c.title),
+              },
+              axis: {
+                labelAngle: isMobile ? -90 : -45,
+                labelLimit: isMobile ? 50 : 120,
+                labelFontSize: isMobile ? 11 : 13,
+                labelColor: '#4B5563',
+                labelFont: 'var(--font-inter), var(--font-noto), sans-serif',
+                titleFontSize: isMobile ? 12 : 14,
+                titleFontWeight: '600',
+                titleColor: '#1A1A1A',
+                titleFont: 'var(--font-inter), var(--font-noto), sans-serif',
+                titlePadding: 12,
+                domain: true,
+                domainColor: '#E5E7EB',
+                domainWidth: 1,
+                tickSize: 0,
+              },
+            },
+            y: {
+              field: 'bizDevPhase',
+              type: 'ordinal',
+              title: 'Biz-Devフェーズ',
+              scale: {
+                domain: phasesToUse.map(p => p.title),
+              },
+              axis: {
+                labelFontSize: isMobile ? 11 : 13,
+                labelColor: '#4B5563',
+                labelFont: 'var(--font-inter), var(--font-noto), sans-serif',
+                titleFontSize: isMobile ? 12 : 14,
+                titleFontWeight: '600',
+                titleColor: '#1A1A1A',
+                titleFont: 'var(--font-inter), var(--font-noto), sans-serif',
+                titlePadding: 12,
+                domain: true,
+                domainColor: '#E5E7EB',
+                domainWidth: 1,
+                tickSize: 0,
+              },
+            },
+            color: {
+              field: 'count',
+              type: 'quantitative',
+              scale: {
+                scheme: 'blues',
+                domain: [0, Math.max(...matrixData.map(d => d.count), 1)],
+              },
+              legend: {
+                title: '件数',
+                labelFontSize: isMobile ? 11 : 13,
+                labelColor: '#6B7280',
+                titleFontSize: isMobile ? 12 : 14,
+                titleFontWeight: '600',
+                titleColor: '#1A1A1A',
+              },
+            },
+            tooltip: [
+              { field: 'category', title: matrixXAxisMode === 'parent' ? '親カテゴリー' : 'サブカテゴリー' },
+              { field: 'bizDevPhase', title: 'Biz-Devフェーズ' },
+              { field: 'count', title: 'スタートアップ件数', format: ',d' },
+            ],
+          },
+        },
+        // 2. 数字のテキスト
+        {
+          mark: {
+            type: 'text',
+            fontSize: isMobile ? 12 : 14,
+            fontWeight: '600',
+            fill: '#1A1A1A',
+            font: 'var(--font-inter), var(--font-noto), sans-serif',
+          },
+          encoding: {
+            x: {
+              field: 'category',
+              type: 'ordinal',
+            },
+            y: {
+              field: 'bizDevPhase',
+              type: 'ordinal',
+            },
+            text: {
+              field: 'count',
+              type: 'quantitative',
+              format: 'd',
+            },
+            color: {
+              condition: {
+                test: 'datum.count > 0',
+                value: '#1A1A1A',
+              },
+              value: '#9CA3AF',
+            },
+          },
+        },
+      ],
+      selection: {
+        clicked_cell: {
+          type: 'single',
+          on: 'click',
+          fields: ['parentCategoryId', 'bizDevPhaseId'],
+          empty: 'none',
+        },
+      },
+    };
+  }, [matrixData, categories, bizDevPhases, orderedBizDevPhases, categoryManagement.orderedCategories]);
+
+  // 選択されたマトリクスセルに紐づくスタートアップを取得
+  const getSelectedMatrixStartups = useMemo(() => {
+    if (!selectedMatrixCell) return [];
+
+    // 親カテゴリーまたはその子カテゴリーに紐づくスタートアップで、かつ該当するBiz-Devフェーズのものを取得
+    const childCategoryIds = categories
+      .filter(c => c.parentCategoryId === selectedMatrixCell.parentCategoryId)
+      .map(c => c.id);
+    const allCategoryIds = [selectedMatrixCell.parentCategoryId, ...childCategoryIds];
+
+    return startups.filter(startup => 
+      startup.categoryIds && 
+      startup.categoryIds.some(catId => allCategoryIds.includes(catId)) &&
+      startup.bizDevPhase === selectedMatrixCell.bizDevPhaseId
+    );
+  }, [selectedMatrixCell, startups, categories]);
 
   const handleNodeClick = (node: RelationshipNode) => {
     // ノードクリック時の処理（必要に応じて実装）
@@ -258,161 +590,133 @@ export function CategorySection({
     return getCategoryStartups(selectedCategory);
   }, [selectedBarCategoryId, categories, startups]);
 
-  // 棒グラフの仕様を生成（積み上げ形式）
+  // 選択されたカテゴリーのスタートアップをBiz-Devフェーズごとにグループ化
+  const getSelectedCategoryStartupsByBizDevPhase = useMemo(() => {
+    if (!selectedBarCategoryId || getSelectedCategoryStartups.length === 0) return new Map<string, { phase: BizDevPhase | null; startups: Startup[] }>();
+
+    const grouped = new Map<string, { phase: BizDevPhase | null; startups: Startup[] }>();
+    
+    // Biz-Devフェーズ未設定のグループ
+    const noPhaseStartups: Startup[] = [];
+    
+    getSelectedCategoryStartups.forEach(startup => {
+      if (startup.bizDevPhase) {
+        const phase = bizDevPhases.find(p => p.id === startup.bizDevPhase);
+        if (phase) {
+          const key = phase.id;
+          if (!grouped.has(key)) {
+            grouped.set(key, { phase, startups: [] });
+          }
+          grouped.get(key)!.startups.push(startup);
+        } else {
+          noPhaseStartups.push(startup);
+        }
+      } else {
+        noPhaseStartups.push(startup);
+      }
+    });
+    
+    // Biz-Devフェーズ未設定のスタートアップがある場合は追加
+    if (noPhaseStartups.length > 0) {
+      grouped.set('no-phase', { phase: null, startups: noPhaseStartups });
+    }
+    
+    return grouped;
+  }, [selectedBarCategoryId, getSelectedCategoryStartups, bizDevPhases]);
+
+  // 棒グラフの仕様を生成（横軸モードに応じて）
   const barChartSpec = useMemo(() => {
     if (categoryChartData.length === 0) return null;
 
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     const chartHeight = isMobile ? 400 : 500;
 
-    // 親カテゴリーのリストを取得（domain用）
-    const parentCategories = Array.from(new Set(categoryChartData.map(d => d.category)));
-    // サブカテゴリーのリストを取得（凡例用）
-    const subCategories = Array.from(new Set(categoryChartData.map(d => d.subCategory)));
-    const maxColors = 20;
+    // カテゴリーのリストを取得（domain用）
+    const categoryList = Array.from(new Set(categoryChartData.map(d => d.category)))
+      .map(catName => {
+        const cat = categories.find(c => c.title === catName);
+        return cat ? { title: cat.title, position: cat.position ?? 999999 } : { title: catName, position: 999999 };
+      })
+      .sort((a, b) => a.position - b.position)
+      .map(c => c.title);
 
     return {
       $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
-      description: 'カテゴリーごとのスタートアップ件数（サブカテゴリー別）',
+      description: barXAxisMode === 'parent' ? '親カテゴリーごとのスタートアップ件数' : 'サブカテゴリーごとのスタートアップ件数',
       width: 'container',
       height: chartHeight,
       padding: { top: 20, right: 20, bottom: 60, left: 60 },
       data: {
         values: categoryChartData,
       },
-      layer: [
-        // 1. 積み上げ棒グラフ
-        {
-          mark: {
-            type: 'bar',
-            tooltip: true,
-            cursor: 'pointer',
-            cornerRadiusTopLeft: 4,
-            cornerRadiusTopRight: 4,
-            stroke: '#FFFFFF',
-            strokeWidth: 1,
+      mark: {
+        type: 'bar',
+        tooltip: true,
+        cursor: 'pointer',
+        cornerRadiusTopLeft: 4,
+        cornerRadiusTopRight: 4,
+        color: '#4262FF',
+      },
+      encoding: {
+        x: {
+          field: 'category',
+          type: 'ordinal',
+          title: barXAxisMode === 'parent' ? '親カテゴリー' : 'サブカテゴリー',
+          scale: {
+            domain: categoryList,
           },
-          encoding: {
-            x: {
-              field: 'category',
-              type: 'ordinal',
-              title: 'カテゴリー',
-              scale: {
-                domain: parentCategories,
-              },
-              axis: {
-                labelAngle: isMobile ? -90 : -45,
-                labelLimit: isMobile ? 50 : 120,
-                labelFontSize: isMobile ? 11 : 13,
-                labelColor: '#4B5563',
-                labelFont: 'var(--font-inter), var(--font-noto), sans-serif',
-                titleFontSize: isMobile ? 12 : 14,
-                titleFontWeight: '600',
-                titleColor: '#1A1A1A',
-                titleFont: 'var(--font-inter), var(--font-noto), sans-serif',
-                titlePadding: 12,
-                domain: true,
-                domainColor: '#E5E7EB',
-                domainWidth: 1,
-                tickSize: 0,
-              },
-            },
-            y: {
-              field: 'count',
-              type: 'quantitative',
-              title: 'スタートアップ件数',
-              axis: {
-                grid: true,
-                gridColor: '#F3F4F6',
-                gridOpacity: 0.5,
-                labelFontSize: isMobile ? 11 : 13,
-                labelColor: '#6B7280',
-                labelFont: 'var(--font-inter), var(--font-noto), sans-serif',
-                titleFontSize: isMobile ? 12 : 14,
-                titleFontWeight: '600',
-                titleColor: '#1A1A1A',
-                titleFont: 'var(--font-inter), var(--font-noto), sans-serif',
-                titlePadding: 12,
-                domain: true,
-                domainColor: '#E5E7EB',
-                domainWidth: 1,
-                tickSize: 0,
-              },
-              stack: 'zero', // 積み上げグラフ
-            },
-            color: {
-              field: 'subCategory',
-              type: 'nominal',
-              title: 'サブカテゴリー',
-              scale: {
-                scheme: subCategories.length <= maxColors ? 'category20' : 'category20b',
-              },
-              legend: {
-                orient: isMobile ? 'bottom' : 'right',
-                columns: isMobile ? 2 : 1,
-                symbolLimit: subCategories.length > 20 ? 50 : undefined,
-                labelFontSize: isMobile ? 11 : 13,
-                labelColor: '#4B5563',
-                labelFont: 'var(--font-inter), var(--font-noto), sans-serif',
-                titleFontSize: isMobile ? 12 : 14,
-                titleFontWeight: '600',
-                titleColor: '#1A1A1A',
-                titleFont: 'var(--font-inter), var(--font-noto), sans-serif',
-                titlePadding: 8,
-                symbolType: 'circle',
-                symbolSize: 80,
-                padding: 8,
-                offset: isMobile ? 0 : 20,
-              },
-            },
-            tooltip: [
-              { field: 'category', type: 'nominal', title: 'カテゴリー' },
-              { field: 'subCategory', type: 'nominal', title: 'サブカテゴリー' },
-              { field: 'count', type: 'quantitative', title: '件数', format: 'd' },
-            ],
+          axis: {
+            labelAngle: isMobile ? -90 : -45,
+            labelLimit: isMobile ? 50 : 120,
+            labelFontSize: isMobile ? 11 : 13,
+            labelColor: '#4B5563',
+            labelFont: 'var(--font-inter), var(--font-noto), sans-serif',
+            titleFontSize: isMobile ? 12 : 14,
+            titleFontWeight: '600',
+            titleColor: '#1A1A1A',
+            titleFont: 'var(--font-inter), var(--font-noto), sans-serif',
+            titlePadding: 12,
+            domain: true,
+            domainColor: '#E5E7EB',
+            domainWidth: 1,
+            tickSize: 0,
           },
         },
-        // 2. カテゴリーごとの合計値を表示するテキストレイヤー
-        {
-          mark: {
-            type: 'text',
-            align: 'center',
-            baseline: 'bottom',
-            dy: -8,
-            fontSize: isMobile ? 12 : 14,
-            fontWeight: '600',
-            fill: '#1A1A1A',
-            font: 'var(--font-inter), var(--font-noto), sans-serif',
-          },
-          encoding: {
-            x: {
-              field: 'category',
-              type: 'ordinal',
-            },
-            y: {
-              aggregate: 'sum',
-              field: 'count',
-              type: 'quantitative',
-            },
-            text: {
-              aggregate: 'sum',
-              field: 'count',
-              type: 'quantitative',
-              format: 'd',
-            },
-            tooltip: [
-              { field: 'category', type: 'nominal', title: 'カテゴリー' },
-              {
-                aggregate: 'sum',
-                field: 'count',
-                type: 'quantitative',
-                title: '合計件数',
-                format: 'd',
-              },
-            ],
+        y: {
+          field: 'count',
+          type: 'quantitative',
+          title: 'スタートアップ件数',
+          axis: {
+            grid: true,
+            gridColor: '#F3F4F6',
+            gridOpacity: 0.5,
+            labelFontSize: isMobile ? 11 : 13,
+            labelColor: '#6B7280',
+            labelFont: 'var(--font-inter), var(--font-noto), sans-serif',
+            titleFontSize: isMobile ? 12 : 14,
+            titleFontWeight: '600',
+            titleColor: '#1A1A1A',
+            titleFont: 'var(--font-inter), var(--font-noto), sans-serif',
+            titlePadding: 12,
+            domain: true,
+            domainColor: '#E5E7EB',
+            domainWidth: 1,
+            tickSize: 0,
           },
         },
-      ],
+        tooltip: [
+          { field: 'category', type: 'nominal', title: barXAxisMode === 'parent' ? '親カテゴリー' : 'サブカテゴリー' },
+          { field: 'count', type: 'quantitative', title: '件数', format: 'd' },
+        ],
+      },
+      selection: {
+        clicked_theme: {
+          type: 'single',
+          on: 'click',
+          fields: ['categoryId'],
+          empty: 'none',
+        },
+      },
       config: {
         view: {
           stroke: 'transparent',
@@ -430,7 +734,7 @@ export function CategorySection({
         },
       },
     };
-  }, [categoryChartData]);
+  }, [categoryChartData, barXAxisMode, categories]);
 
   return (
     <>
@@ -690,8 +994,8 @@ export function CategorySection({
                           fontSize: '10px',
                           transition: 'transform 0.2s',
                           transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                        }}
-                      >
+                    }}
+                  >
                         ▶
                       </div>
                     )}
@@ -715,18 +1019,18 @@ export function CategorySection({
                     </div>
                     
                     {/* カテゴリー名 */}
-                    <div style={{
+                      <div style={{
                       flex: 1,
-                      fontSize: '14px',
+                        fontSize: '14px',
                       fontWeight: '500',
                       color: '#1A1A1A',
-                      fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                        fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
-                    }}>
+                      }}>
                       {category.title}
-                    </div>
+                      </div>
                     
                     {/* 説明がある場合のインジケーター */}
                     {category.description && (
@@ -744,7 +1048,7 @@ export function CategorySection({
                   {/* 子カテゴリー（展開時のみ表示） */}
                   {hasChildren && isExpanded && (
                     <div style={{ marginLeft: '0px' }}>
-                      {children.map(child => renderCategory(child, level + 1))}
+                  {children.map(child => renderCategory(child, level + 1))}
                     </div>
                   )}
                 </div>
@@ -833,7 +1137,7 @@ export function CategorySection({
                   maxHeight: '600px',
                   overflowY: 'auto',
                 }}>
-                  {topLevelCategories.map(category => renderCategory(category))}
+                {topLevelCategories.map(category => renderCategory(category))}
                 </div>
               </div>
             );
@@ -854,16 +1158,12 @@ export function CategorySection({
             flexWrap: 'wrap',
           }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
-              <CategorySelector
-                categories={categories}
+            <CategorySelector
+              categories={categories}
                 selectedCategoryIds={selectedCategoryIds}
                 onSelect={setSelectedCategoryIds}
-              />
-            </div>
-            <ViewModeSelector
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
             />
+            </div>
           </div>
 
           {/* 統計情報カード */}
@@ -1071,8 +1371,405 @@ export function CategorySection({
             </div>
           </div>
 
-          {/* 2D関係性図、バブルチャート、または棒グラフ */}
-          {viewMode === 'bar' ? (
+          {/* 表示モード選択 */}
+          <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('matrix')}
+              style={{
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: viewMode === 'matrix' ? '600' : '400',
+                color: viewMode === 'matrix' ? '#FFFFFF' : '#1A1A1A',
+                backgroundColor: viewMode === 'matrix' ? '#4262FF' : '#FFFFFF',
+                border: '1.5px solid',
+                borderColor: viewMode === 'matrix' ? '#4262FF' : '#E0E0E0',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              }}
+              onMouseEnter={(e) => {
+                if (viewMode !== 'matrix') {
+                  e.currentTarget.style.borderColor = '#C4C4C4';
+                  e.currentTarget.style.backgroundColor = '#FAFAFA';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (viewMode !== 'matrix') {
+                  e.currentTarget.style.borderColor = '#E0E0E0';
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }
+              }}
+            >
+              マトリクス
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('bar')}
+              style={{
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: viewMode === 'bar' ? '600' : '400',
+                color: viewMode === 'bar' ? '#FFFFFF' : '#1A1A1A',
+                backgroundColor: viewMode === 'bar' ? '#4262FF' : '#FFFFFF',
+                border: '1.5px solid',
+                borderColor: viewMode === 'bar' ? '#4262FF' : '#E0E0E0',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              }}
+              onMouseEnter={(e) => {
+                if (viewMode !== 'bar') {
+                  e.currentTarget.style.borderColor = '#C4C4C4';
+                  e.currentTarget.style.backgroundColor = '#FAFAFA';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (viewMode !== 'bar') {
+                  e.currentTarget.style.borderColor = '#E0E0E0';
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }
+              }}
+            >
+              棒グラフ
+            </button>
+          </div>
+
+          {/* 棒グラフ表示時の横軸切り替え */}
+          {viewMode === 'bar' && (
+            <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setBarXAxisMode('parent');
+                  setSelectedBarCategoryId(null); // 切り替え時に選択をクリア
+                }}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: barXAxisMode === 'parent' ? '600' : '400',
+                  color: barXAxisMode === 'parent' ? '#FFFFFF' : '#1A1A1A',
+                  backgroundColor: barXAxisMode === 'parent' ? '#4262FF' : '#FFFFFF',
+                  border: '1.5px solid',
+                  borderColor: barXAxisMode === 'parent' ? '#4262FF' : '#E0E0E0',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                }}
+                onMouseEnter={(e) => {
+                  if (barXAxisMode !== 'parent') {
+                    e.currentTarget.style.borderColor = '#C4C4C4';
+                    e.currentTarget.style.backgroundColor = '#FAFAFA';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (barXAxisMode !== 'parent') {
+                    e.currentTarget.style.borderColor = '#E0E0E0';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }
+                }}
+              >
+                親カテゴリー
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBarXAxisMode('sub');
+                  setSelectedBarCategoryId(null); // 切り替え時に選択をクリア
+                }}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: barXAxisMode === 'sub' ? '600' : '400',
+                  color: barXAxisMode === 'sub' ? '#FFFFFF' : '#1A1A1A',
+                  backgroundColor: barXAxisMode === 'sub' ? '#4262FF' : '#FFFFFF',
+                  border: '1.5px solid',
+                  borderColor: barXAxisMode === 'sub' ? '#4262FF' : '#E0E0E0',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                }}
+                onMouseEnter={(e) => {
+                  if (barXAxisMode !== 'sub') {
+                    e.currentTarget.style.borderColor = '#C4C4C4';
+                    e.currentTarget.style.backgroundColor = '#FAFAFA';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (barXAxisMode !== 'sub') {
+                    e.currentTarget.style.borderColor = '#E0E0E0';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }
+                }}
+              >
+                サブカテゴリー
+              </button>
+            </div>
+          )}
+
+          {/* マトリクス表示時の横軸切り替え */}
+          {viewMode === 'matrix' && (
+            <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setMatrixXAxisMode('parent');
+                  setSelectedMatrixCell(null); // 切り替え時に選択をクリア
+                }}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: matrixXAxisMode === 'parent' ? '600' : '400',
+                  color: matrixXAxisMode === 'parent' ? '#FFFFFF' : '#1A1A1A',
+                  backgroundColor: matrixXAxisMode === 'parent' ? '#4262FF' : '#FFFFFF',
+                  border: '1.5px solid',
+                  borderColor: matrixXAxisMode === 'parent' ? '#4262FF' : '#E0E0E0',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                }}
+                onMouseEnter={(e) => {
+                  if (matrixXAxisMode !== 'parent') {
+                    e.currentTarget.style.borderColor = '#C4C4C4';
+                    e.currentTarget.style.backgroundColor = '#FAFAFA';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (matrixXAxisMode !== 'parent') {
+                    e.currentTarget.style.borderColor = '#E0E0E0';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }
+                }}
+              >
+                親カテゴリー
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMatrixXAxisMode('sub');
+                  setSelectedMatrixCell(null); // 切り替え時に選択をクリア
+                }}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: matrixXAxisMode === 'sub' ? '600' : '400',
+                  color: matrixXAxisMode === 'sub' ? '#FFFFFF' : '#1A1A1A',
+                  backgroundColor: matrixXAxisMode === 'sub' ? '#4262FF' : '#FFFFFF',
+                  border: '1.5px solid',
+                  borderColor: matrixXAxisMode === 'sub' ? '#4262FF' : '#E0E0E0',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                }}
+                onMouseEnter={(e) => {
+                  if (matrixXAxisMode !== 'sub') {
+                    e.currentTarget.style.borderColor = '#C4C4C4';
+                    e.currentTarget.style.backgroundColor = '#FAFAFA';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (matrixXAxisMode !== 'sub') {
+                    e.currentTarget.style.borderColor = '#E0E0E0';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }
+                }}
+              >
+                サブカテゴリー
+              </button>
+            </div>
+          )}
+
+          {/* 2D関係性図、バブルチャート、棒グラフ、またはマトリクス */}
+          {viewMode === 'matrix' ? (
+            matrixChartSpec && matrixData.length > 0 ? (
+              <div style={{ marginBottom: '32px' }}>
+                <div style={{
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                  padding: '24px',
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    marginBottom: '20px',
+                    paddingBottom: '16px',
+                    borderBottom: '1px solid #F3F4F6',
+                  }}>
+                    <h3 style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: '#1A1A1A',
+                      margin: 0,
+                      fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                    }}>
+                      カテゴリー × Biz-Devフェーズ マトリクス
+                    </h3>
+                  </div>
+                  <DynamicVegaChart
+                    spec={matrixChartSpec}
+                    language="vega-lite"
+                    chartData={matrixData}
+                    noBorder={true}
+                    onSignal={(signalName: string, value: any) => {
+                      console.log('📊 [CategorySection] Matrix signal received:', signalName, value);
+                      if (signalName === 'clicked_cell' || signalName === 'click' || signalName === 'clicked_theme') {
+                        if (value && value.datum) {
+                          const datum = value.datum;
+                          if (datum.parentCategoryId && datum.bizDevPhaseId) {
+                            console.log('✅ [CategorySection] Setting matrix cell:', datum.parentCategoryId, datum.bizDevPhaseId);
+                            setSelectedMatrixCell({
+                              parentCategoryId: datum.parentCategoryId,
+                              bizDevPhaseId: datum.bizDevPhaseId,
+                            });
+                          }
+                        } else if (value && value.parentCategoryId && value.bizDevPhaseId) {
+                          console.log('✅ [CategorySection] Setting matrix cell (direct):', value.parentCategoryId, value.bizDevPhaseId);
+                          setSelectedMatrixCell({
+                            parentCategoryId: value.parentCategoryId,
+                            bizDevPhaseId: value.bizDevPhaseId,
+                          });
+                        }
+                      }
+                    }}
+            />
+          </div>
+
+                {/* 選択されたマトリクスセルのスタートアップ一覧 */}
+                {selectedMatrixCell && getSelectedMatrixStartups.length > 0 && (
+                  <div style={{ marginTop: '32px' }}>
+                    <div style={{
+                      marginBottom: '16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}>
+                      <h4 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#1A1A1A',
+                        margin: 0,
+                        fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                      }}>
+                        {matrixXAxisMode === 'parent' 
+                          ? categories.find(cat => cat.id === selectedMatrixCell.parentCategoryId)?.title
+                          : categories.find(cat => cat.id === selectedMatrixCell.parentCategoryId)?.title} × {bizDevPhases.find(phase => phase.id === selectedMatrixCell.bizDevPhaseId)?.title} に紐づくスタートアップ
+                        <span style={{
+                          marginLeft: '8px',
+                          fontSize: '14px',
+                          fontWeight: '400',
+                          color: '#6B7280',
+                        }}>
+                          ({getSelectedMatrixStartups.length}件)
+                        </span>
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMatrixCell(null)}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          color: '#6B7280',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E0E0E0',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 150ms',
+                          fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#C4C4C4';
+                          e.currentTarget.style.backgroundColor = '#FAFAFA';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#E0E0E0';
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }}
+                      >
+                        クリア
+                      </button>
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 768 
+                        ? '1fr' 
+                        : 'repeat(auto-fill, minmax(300px, 1fr))',
+                      gap: '16px',
+                    }}>
+                      {getSelectedMatrixStartups.map((startup) => (
+                        <div
+                          key={startup.id}
+                          onClick={() => {
+                            router.push(`/organization/startup?organizationId=${startup.organizationId}&startupId=${startup.id}`);
+                          }}
+                          style={{
+                            padding: '16px',
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#4262FF';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(66, 98, 255, 0.15)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#E5E7EB';
+                            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          <div style={{
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            color: '#1A1A1A',
+                            marginBottom: '8px',
+                            fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                          }}>
+                            {startup.title}
+                          </div>
+                          {startup.description && (
+                            <div style={{
+                              fontSize: '14px',
+                              color: '#6B7280',
+                              lineHeight: '1.5',
+                              fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                            }}>
+                              {startup.description.length > 100 
+                                ? `${startup.description.substring(0, 100)}...` 
+                                : startup.description}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{
+                padding: '40px',
+                textAlign: 'center',
+                color: '#6B7280',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E5E7EB',
+                borderRadius: '12px',
+                fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+              }}>
+                マトリクスデータがありません。
+              </div>
+            )
+          ) : viewMode === 'bar' ? (
             barChartSpec && categoryChartData.length > 0 ? (
               <div style={{ marginBottom: '32px' }}>
                 <div style={{
@@ -1135,8 +1832,8 @@ export function CategorySection({
                   />
                 </div>
                 
-                {/* 選択されたカテゴリーのスタートアップ一覧 */}
-                {selectedBarCategoryId && getSelectedCategoryStartups.length > 0 && (
+                {/* 選択されたカテゴリーのスタートアップ一覧（Biz-Devフェーズごとにグループ化） */}
+                {selectedBarCategoryId && getSelectedCategoryStartupsByBizDevPhase.size > 0 && (
                   <div style={{ marginTop: '32px' }}>
                     <div style={{
                       marginBottom: '16px',
@@ -1188,72 +1885,97 @@ export function CategorySection({
                         閉じる
                       </button>
                     </div>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                      gap: '16px',
-                    }}>
-                      {getSelectedCategoryStartups.map((startup) => (
-                        <div
-                          key={startup.id}
-                          onClick={() => {
-                            if (startup.organizationId && startup.id) {
-                              router.push(`/organization/startup?organizationId=${startup.organizationId}&startupId=${startup.id}`);
-                            }
-                          }}
-                          style={{
-                            padding: '16px',
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #E5E7EB',
-                            borderRadius: '8px',
-                            transition: 'all 0.2s ease',
-                            cursor: startup.organizationId ? 'pointer' : 'default',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (startup.organizationId) {
-                              e.currentTarget.style.backgroundColor = '#F9FAFB';
-                              e.currentTarget.style.borderColor = '#4262FF';
-                              e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (startup.organizationId) {
-                              e.currentTarget.style.backgroundColor = '#FFFFFF';
-                              e.currentTarget.style.borderColor = '#E5E7EB';
-                              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }
-                          }}
-                        >
-                          <div style={{
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            marginBottom: '8px',
-                            fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                    
+                    {/* Biz-Devフェーズごとにセクション分け */}
+                    {Array.from(getSelectedCategoryStartupsByBizDevPhase.entries()).map(([phaseId, { phase, startups }]) => (
+                      <div key={phaseId} style={{ marginBottom: '32px' }}>
+                        <h5 style={{
+                          fontSize: '15px',
+                          fontWeight: '600',
+                          color: '#1A1A1A',
+                          marginBottom: '16px',
+                          paddingBottom: '8px',
+                          borderBottom: '2px solid #E5E7EB',
+                          fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                        }}>
+                          {phase ? phase.title : 'Biz-Devフェーズ未設定'}
+                          <span style={{
+                            marginLeft: '8px',
+                            fontSize: '13px',
+                            fontWeight: '400',
+                            color: '#6B7280',
                           }}>
-                            {startup.title}
-                          </div>
-                          {startup.description && (
-                            <div style={{
-                              fontSize: '14px',
-                              color: '#6B7280',
-                              marginTop: '8px',
-                              lineHeight: '1.5',
-                              fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 3,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                            }}>
-                              {startup.description}
+                            ({startups.length}件)
+                          </span>
+                        </h5>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                          gap: '16px',
+                        }}>
+                          {startups.map((startup) => (
+                            <div
+                              key={startup.id}
+                              onClick={() => {
+                                if (startup.organizationId && startup.id) {
+                                  router.push(`/organization/startup?organizationId=${startup.organizationId}&startupId=${startup.id}`);
+                                }
+                              }}
+                              style={{
+                                padding: '16px',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #E5E7EB',
+                                borderRadius: '8px',
+                                transition: 'all 0.2s ease',
+                                cursor: startup.organizationId ? 'pointer' : 'default',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (startup.organizationId) {
+                                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                                  e.currentTarget.style.borderColor = '#4262FF';
+                                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (startup.organizationId) {
+                                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                                  e.currentTarget.style.borderColor = '#E5E7EB';
+                                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                }
+                              }}
+                            >
+                              <div style={{
+                                fontSize: '16px',
+                                fontWeight: '600',
+                                color: '#1A1A1A',
+                                marginBottom: '8px',
+                                fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                              }}>
+                                {startup.title}
+                              </div>
+                              {startup.description && (
+                                <div style={{
+                                  fontSize: '14px',
+                                  color: '#6B7280',
+                                  marginTop: '8px',
+                                  lineHeight: '1.5',
+                                  fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 3,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                }}>
+                                  {startup.description}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

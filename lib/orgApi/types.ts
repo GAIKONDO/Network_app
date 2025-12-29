@@ -190,6 +190,40 @@ export interface EvaluationChartSnapshot {
 }
 
 /**
+ * 競合比較の比較軸
+ */
+export interface CompetitorComparisonAxis {
+  id: string;
+  label: string;
+}
+
+/**
+ * 競合比較データ
+ */
+export interface CompetitorComparisonData {
+  id: string;
+  axes: CompetitorComparisonAxis[];
+  selectedStartupIds: string[];
+  matrix: {
+    [startupId: string]: {
+      [axisId: string]: boolean;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Deepsearchデータ
+ */
+export interface DeepSearchData {
+  id: string;
+  content: string; // マークダウン形式のコンテンツ
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * スタートアップの型定義
  */
 export interface Startup {
@@ -232,6 +266,8 @@ export interface Startup {
   hpUrl?: string; // HP URL
   asanaUrl?: string; // Asana URL
   boxUrl?: string; // Box URL
+  competitorComparison?: CompetitorComparisonData; // 競合比較データ
+  deepSearch?: DeepSearchData; // Deepsearchデータ
   createdAt?: any;
   updatedAt?: any;
 }

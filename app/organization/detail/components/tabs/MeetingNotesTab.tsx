@@ -88,10 +88,10 @@ export default function MeetingNotesTab({
         </button>
       </div>
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)', margin: 0 }}>
-            議事録 ({meetingNotes.length}件)
-          </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)', margin: 0 }}>
+          議事録 ({meetingNotes.length}件)
+        </h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {meetingNotesByOrg.size > 1 && (
               <button
@@ -146,37 +146,37 @@ export default function MeetingNotesTab({
                 })()}
               </button>
             )}
-            <button
-              onClick={onOpenAddModal}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#10B981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#059669';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#10B981';
-              }}
-            >
-              + 追加
-            </button>
+        <button
+          onClick={onOpenAddModal}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#10B981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#059669';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#10B981';
+          }}
+        >
+          + 追加
+        </button>
           </div>
-        </div>
-        {meetingNotes.length === 0 ? (
-          <p style={{ color: 'var(--color-text-light)', padding: '20px', textAlign: 'center' }}>
-            議事録が登録されていません
-          </p>
-        ) : (
+      </div>
+      {meetingNotes.length === 0 ? (
+        <p style={{ color: 'var(--color-text-light)', padding: '20px', textAlign: 'center' }}>
+          議事録が登録されていません
+        </p>
+      ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {Array.from(meetingNotesByOrg.entries()).map(([orgId, orgData]) => {
               const isCurrentOrg = orgId === organizationId;
@@ -248,21 +248,21 @@ export default function MeetingNotesTab({
                     )}
                   </div>
                   {isExpanded && (
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                        gap: '16px',
-                      }}
-                    >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '16px',
+          }}
+        >
                       {orgData.meetingNotes.map((note) => (
-                        <div
-                          key={note.id}
-                          onClick={() => {
+            <div
+              key={note.id}
+              onClick={() => {
                             if (editingMeetingNoteId !== note.id && note.organizationId && note.id) {
                               router.push(`/organization/detail/meeting?meetingId=${note.id}&id=${note.organizationId}`);
-                            }
-                          }}
+                }
+              }}
               style={{
                 padding: '16px',
                 backgroundColor: '#ffffff',
@@ -466,9 +466,9 @@ export default function MeetingNotesTab({
                 </>
               )}
             </div>
-                      ))}
-                    </div>
-                  )}
+          ))}
+        </div>
+      )}
                 </div>
               );
             })}

@@ -1,6 +1,6 @@
 'use client';
 
-export type StartupTab = 'overview' | 'details' | 'periods' | 'relations' | 'monetization' | 'relation';
+export type StartupTab = 'overview' | 'details' | 'deepsearch' | 'competitor-comparison' | 'periods' | 'relations' | 'monetization' | 'relation';
 
 interface StartupTabBarProps {
   activeTab: StartupTab;
@@ -11,6 +11,8 @@ export function StartupTabBar({ activeTab, onTabChange }: StartupTabBarProps) {
   const tabs: { id: StartupTab; label: string }[] = [
     { id: 'overview', label: '概要' },
     { id: 'details', label: '詳細' },
+    { id: 'deepsearch', label: 'Deepsearch' },
+    { id: 'competitor-comparison', label: '競合比較' },
     { id: 'periods', label: '期間' },
     { id: 'relations', label: '特性要因図' },
     { id: 'monetization', label: 'マネタイズ' },

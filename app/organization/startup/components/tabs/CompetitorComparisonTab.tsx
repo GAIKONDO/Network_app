@@ -1,0 +1,681 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import type { Startup, CompetitorComparisonData } from '@/lib/orgApi';
+import { getAllStartups, saveStartup } from '@/lib/orgApi/startups';
+import { generateUniqueId } from '@/lib/orgApi';
+
+interface CompetitorComparisonTabProps {
+  startup: Startup | null;
+  organizationId: string;
+  setStartup?: (startup: Startup) => void;
+}
+
+interface ComparisonAxis {
+  id: string;
+  label: string;
+  isEditing?: boolean;
+}
+
+interface ComparisonMatrix {
+  [startupId: string]: {
+    [axisId: string]: boolean;
+  };
+}
+
+export default function CompetitorComparisonTab({
+  startup,
+  organizationId,
+  setStartup,
+}: CompetitorComparisonTabProps) {
+  const [allStartups, setAllStartups] = useState<Startup[]>([]);
+  const [selectedStartups, setSelectedStartups] = useState<string[]>([]);
+  const [comparisonAxes, setComparisonAxes] = useState<ComparisonAxis[]>([]);
+  const [comparisonMatrix, setComparisonMatrix] = useState<ComparisonMatrix>({});
+  const [isGeneratingAxes, setIsGeneratingAxes] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [editingAxisId, setEditingAxisId] = useState<string | null>(null);
+  const [editingAxisLabel, setEditingAxisLabel] = useState<string>('');
+  const [comparisonId, setComparisonId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 保存された競合比較データを読み込む
+  useEffect(() => {
+    if (!startup) return;
+    
+    if (startup.competitorComparison) {
+      const saved = startup.competitorComparison;
+      console.log('📖 [CompetitorComparisonTab] 保存されたデータを読み込み:', {
+        id: saved.id,
+        axesCount: saved.axes?.length || 0,
+        selectedStartupsCount: saved.selectedStartupIds?.length || 0,
+        matrixKeys: Object.keys(saved.matrix || {}),
+      });
+      setComparisonId(saved.id);
+      setComparisonAxes(saved.axes || []);
+      setSelectedStartups(saved.selectedStartupIds || []);
+      setComparisonMatrix(saved.matrix || {});
+    } else {
+      // データがない場合は初期化（startupが存在する場合のみ）
+      console.log('📖 [CompetitorComparisonTab] 保存されたデータなし');
+      // 既存のデータをクリアしない（ユーザーが編集中の可能性があるため）
+      // ただし、startupが変更された場合は初期化
+      if (comparisonId) {
+        // 既存のIDがある場合は、新しいstartupにデータがないことを示す
+        console.log('📖 [CompetitorComparisonTab] 新しいstartupにデータなし、IDをクリア');
+        setComparisonId(null);
+      }
+    }
+  }, [startup?.id, startup?.competitorComparison]);
+
+  // すべてのスタートアップを取得
+  useEffect(() => {
+    const loadStartups = async () => {
+      try {
+        setIsLoading(true);
+        const startups = await getAllStartups();
+        // 現在のスタートアップを除外
+        const filtered = startups.filter(s => s.id !== startup?.id);
+        setAllStartups(filtered);
+        
+        // 保存されたデータがない場合のみ初期選択
+        if (!startup?.competitorComparison && filtered.length > 0) {
+          setSelectedStartups(filtered.slice(0, Math.min(5, filtered.length)).map(s => s.id));
+        }
+      } catch (error) {
+        console.error('スタートアップの取得に失敗しました:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (startup) {
+      loadStartups();
+    }
+  }, [startup]);
+
+  // 比較軸をAIで生成（プレースホルダー）
+  const generateComparisonAxes = async () => {
+    setIsGeneratingAxes(true);
+    // TODO: AI APIを呼び出して比較軸を生成
+    // 現在はプレースホルダーの比較軸を生成
+    setTimeout(() => {
+      const defaultAxes: ComparisonAxis[] = [
+        { id: 'axis1', label: '技術優位性' },
+        { id: 'axis2', label: '市場規模' },
+        { id: 'axis3', label: '資金調達状況' },
+        { id: 'axis4', label: 'パートナーシップ' },
+        { id: 'axis5', label: '製品成熟度' },
+        { id: 'axis6', label: '顧客基盤' },
+      ];
+      setComparisonAxes(defaultAxes);
+      setIsGeneratingAxes(false);
+    }, 1000);
+  };
+
+  // 比較軸の編集を開始
+  const startEditingAxis = (axis: ComparisonAxis) => {
+    setEditingAxisId(axis.id);
+    setEditingAxisLabel(axis.label);
+  };
+
+  // 比較軸の編集を保存
+  const saveEditingAxis = () => {
+    if (editingAxisId && editingAxisLabel.trim()) {
+      setComparisonAxes(prev => prev.map(axis => 
+        axis.id === editingAxisId ? { ...axis, label: editingAxisLabel.trim() } : axis
+      ));
+    }
+    setEditingAxisId(null);
+    setEditingAxisLabel('');
+  };
+
+  // 比較軸の編集をキャンセル
+  const cancelEditingAxis = () => {
+    setEditingAxisId(null);
+    setEditingAxisLabel('');
+  };
+
+  // 比較軸を削除
+  const deleteAxis = (axisId: string) => {
+    setComparisonAxes(prev => prev.filter(axis => axis.id !== axisId));
+    // マトリクスからも削除
+    setComparisonMatrix(prev => {
+      const newMatrix = { ...prev };
+      Object.keys(newMatrix).forEach(startupId => {
+        delete newMatrix[startupId][axisId];
+      });
+      return newMatrix;
+    });
+  };
+
+  // 新しい比較軸を追加
+  const addNewAxis = () => {
+    const newId = `axis_${Date.now()}`;
+    const newAxis: ComparisonAxis = {
+      id: newId,
+      label: '新しい比較軸',
+    };
+    setComparisonAxes(prev => [...prev, newAxis]);
+    setEditingAxisId(newId);
+    setEditingAxisLabel('新しい比較軸');
+  };
+
+  // 競合比較データを保存
+  const saveComparisonData = async () => {
+    if (!startup) return;
+
+    try {
+      setIsSaving(true);
+      const now = new Date().toISOString();
+      const comparisonData: CompetitorComparisonData = {
+        id: comparisonId || `comp_${generateUniqueId()}`,
+        axes: comparisonAxes,
+        selectedStartupIds: selectedStartups,
+        matrix: comparisonMatrix,
+        createdAt: comparisonId && startup.competitorComparison?.createdAt 
+          ? startup.competitorComparison.createdAt 
+          : now,
+        updatedAt: now,
+      };
+
+      const updatedStartup = {
+        ...startup,
+        competitorComparison: comparisonData,
+      };
+      
+      console.log('💾 [CompetitorComparisonTab] 保存開始:', {
+        startupId: startup.id,
+        comparisonId: comparisonData.id,
+        axesCount: comparisonData.axes.length,
+        selectedStartupsCount: comparisonData.selectedStartupIds.length,
+        matrixKeys: Object.keys(comparisonData.matrix),
+      });
+      
+      await saveStartup(updatedStartup);
+
+      console.log('✅ [CompetitorComparisonTab] 保存成功');
+
+      setComparisonId(comparisonData.id);
+      
+      // 親コンポーネントのstartupを更新
+      if (setStartup) {
+        setStartup(updatedStartup as Startup);
+      }
+      
+      alert('競合比較データを保存しました');
+    } catch (error) {
+      console.error('競合比較データの保存に失敗しました:', error);
+      alert('保存に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // マトリクスのセルをトグル
+  const toggleMatrixCell = (startupId: string, axisId: string) => {
+    setComparisonMatrix(prev => ({
+      ...prev,
+      [startupId]: {
+        ...prev[startupId],
+        [axisId]: !prev[startupId]?.[axisId],
+      },
+    }));
+  };
+
+  // 選択されたスタートアップのリスト
+  const selectedStartupList = useMemo(() => {
+    return allStartups.filter(s => selectedStartups.includes(s.id));
+  }, [allStartups, selectedStartups]);
+
+  if (!startup) {
+    return (
+      <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>
+        <p>スタートアップデータがありません。</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>
+        <p>読み込み中...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#374151', margin: 0, marginBottom: '4px' }}>
+            競合比較
+          </h2>
+          {comparisonId && (
+            <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
+              ID: {comparisonId}
+            </p>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {comparisonAxes.length > 0 && (
+            <>
+              <button
+                onClick={addNewAxis}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#FFFFFF',
+                  color: '#4262FF',
+                  border: '1.5px solid #4262FF',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#EFF6FF';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                + 比較軸を追加
+              </button>
+              <button
+                onClick={saveComparisonData}
+                disabled={isSaving}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: isSaving ? '#9CA3AF' : '#10B981',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSaving) {
+                    e.currentTarget.style.backgroundColor = '#059669';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSaving) {
+                    e.currentTarget.style.backgroundColor = '#10B981';
+                  }
+                }}
+              >
+                {isSaving ? '保存中...' : '💾 保存'}
+              </button>
+            </>
+          )}
+          <button
+            onClick={generateComparisonAxes}
+            disabled={isGeneratingAxes}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: isGeneratingAxes ? '#9CA3AF' : '#4262FF',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: isGeneratingAxes ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (!isGeneratingAxes) {
+                e.currentTarget.style.backgroundColor = '#3552D4';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isGeneratingAxes) {
+                e.currentTarget.style.backgroundColor = '#4262FF';
+              }
+            }}
+          >
+            {isGeneratingAxes ? '生成中...' : '比較軸をAI生成'}
+          </button>
+        </div>
+      </div>
+
+      {/* 比較対象の選択 */}
+      <div style={{ 
+        backgroundColor: '#FFFFFF', 
+        borderRadius: '8px', 
+        padding: '20px',
+        border: '1px solid #E5E7EB',
+        marginBottom: '24px'
+      }}>
+        <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#374151', marginBottom: '16px' }}>
+          比較対象の選択
+        </h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {allStartups.map(s => (
+            <label
+              key={s.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 16px',
+                backgroundColor: selectedStartups.includes(s.id) ? '#EFF6FF' : '#F9FAFB',
+                border: `1.5px solid ${selectedStartups.includes(s.id) ? '#4262FF' : '#E5E7EB'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: selectedStartups.includes(s.id) ? '#4262FF' : '#374151',
+                fontWeight: selectedStartups.includes(s.id) ? '600' : '400',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selectedStartups.includes(s.id)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedStartups([...selectedStartups, s.id]);
+                  } else {
+                    setSelectedStartups(selectedStartups.filter(id => id !== s.id));
+                  }
+                }}
+                style={{ marginRight: '8px', cursor: 'pointer' }}
+              />
+              {s.title}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* マトリクステーブル */}
+      {comparisonAxes.length > 0 && selectedStartupList.length > 0 && (
+        <div style={{ 
+          backgroundColor: '#FFFFFF', 
+          borderRadius: '8px', 
+          padding: '20px',
+          border: '1px solid #E5E7EB',
+          overflowX: 'auto'
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+            <thead>
+              <tr>
+                <th style={{ 
+                  padding: '12px',
+                  textAlign: 'left',
+                  borderBottom: '2px solid #E5E7EB',
+                  backgroundColor: '#F9FAFB',
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 10,
+                  minWidth: '200px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#374151'
+                }}>
+                  比較軸
+                </th>
+                <th style={{ 
+                  padding: '12px',
+                  textAlign: 'center',
+                  borderBottom: '2px solid #E5E7EB',
+                  backgroundColor: '#F9FAFB',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#4262FF',
+                  minWidth: '150px'
+                }}>
+                  {startup.title}
+                </th>
+                {selectedStartupList.map(s => (
+                  <th 
+                    key={s.id}
+                    style={{ 
+                      padding: '12px',
+                      textAlign: 'center',
+                      borderBottom: '2px solid #E5E7EB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#374151',
+                      minWidth: '150px'
+                    }}
+                  >
+                    {s.title}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {comparisonAxes.map((axis, axisIndex) => (
+                <tr 
+                  key={axis.id}
+                  style={{ position: 'relative' }}
+                  onMouseEnter={(e) => {
+                    const buttons = e.currentTarget.querySelectorAll('[data-action-button]');
+                    buttons.forEach((btn: any) => {
+                      btn.style.opacity = '1';
+                      btn.style.visibility = 'visible';
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    const buttons = e.currentTarget.querySelectorAll('[data-action-button]');
+                    buttons.forEach((btn: any) => {
+                      if (editingAxisId !== axis.id) {
+                        btn.style.opacity = '0';
+                        btn.style.visibility = 'hidden';
+                      }
+                    });
+                  }}
+                >
+                  <td style={{ 
+                    padding: '12px',
+                    borderBottom: '1px solid #E5E7EB',
+                    backgroundColor: '#FFFFFF',
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 5,
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151'
+                  }}>
+                    {editingAxisId === axis.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={editingAxisLabel}
+                          onChange={(e) => setEditingAxisLabel(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              saveEditingAxis();
+                            } else if (e.key === 'Escape') {
+                              cancelEditingAxis();
+                            }
+                          }}
+                          autoFocus
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            border: '1.5px solid #4262FF',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={saveEditingAxis}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#4262FF',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                          title="保存"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={cancelEditingAxis}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#F3F4F6',
+                            color: '#374151',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                          title="キャンセル"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+                        <span style={{ flex: 1 }}>{axis.label}</span>
+                        <button
+                          data-action-button
+                          onClick={() => startEditingAxis(axis)}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: 'transparent',
+                            color: '#6B7280',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            opacity: 0,
+                            visibility: 'hidden',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="編集"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          data-action-button
+                          onClick={() => {
+                            if (confirm(`「${axis.label}」を削除しますか？`)) {
+                              deleteAxis(axis.id);
+                            }
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: 'transparent',
+                            color: '#EF4444',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            opacity: 0,
+                            visibility: 'hidden',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#FEF2F2';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="削除"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ 
+                    padding: '12px',
+                    textAlign: 'center',
+                    borderBottom: '1px solid #E5E7EB',
+                    backgroundColor: '#EFF6FF'
+                  }}>
+                    <div
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        margin: '0 auto',
+                        backgroundColor: '#4262FF',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      ✓
+                    </div>
+                  </td>
+                  {selectedStartupList.map(s => (
+                    <td 
+                      key={s.id}
+                      style={{ 
+                        padding: '12px',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #E5E7EB',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#F9FAFB';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      }}
+                      onClick={() => toggleMatrixCell(s.id, axis.id)}
+                    >
+                      <div
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          margin: '0 auto',
+                          backgroundColor: comparisonMatrix[s.id]?.[axis.id] ? '#4262FF' : '#E5E7EB',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: comparisonMatrix[s.id]?.[axis.id] ? '#FFFFFF' : '#9CA3AF',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        {comparisonMatrix[s.id]?.[axis.id] ? '✓' : ''}
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {comparisonAxes.length === 0 && (
+        <div style={{ 
+          backgroundColor: '#FFFFFF', 
+          borderRadius: '8px', 
+          padding: '40px',
+          border: '1px solid #E5E7EB',
+          textAlign: 'center'
+        }}>
+          <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>
+            比較軸を生成して、競合比較を開始してください。
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+

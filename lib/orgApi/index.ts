@@ -144,6 +144,16 @@ export {
   updateBizDevPhasePositions,
 } from './bizDevPhases';
 
+// カテゴリー・Biz-Devフェーズスナップショット関連
+export {
+  calculateCurrentCounts,
+  saveCategoryBizDevPhaseSnapshot,
+  getAllCategoryBizDevPhaseSnapshots,
+  getCategoryBizDevPhaseSnapshotByDate,
+  deleteCategoryBizDevPhaseSnapshot,
+} from './categoryBizDevPhaseSnapshots';
+export type { CategoryBizDevPhaseSnapshot } from './categoryBizDevPhaseSnapshots';
+
 // トピック関連
 export {
   getTopicsByMeetingNote,

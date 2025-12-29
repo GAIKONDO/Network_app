@@ -288,7 +288,7 @@ function StartupDetailPageContent() {
     // 新しい組織のページに遷移
     router.push(`/organization/startup?organizationId=${newOrganizationId}&startupId=${startupId}`);
   };
-
+  
   // 保存とダウンロードのカスタムフック
   const { handleManualSave, handleDownloadJson } = useStartupSave({
     startup,

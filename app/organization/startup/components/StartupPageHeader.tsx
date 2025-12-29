@@ -149,120 +149,120 @@ export default function StartupPageHeader({
       <style>{spinnerStyle}</style>
       <div style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <div>
-          <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '4px' }}>
-            {orgData ? orgData.name : ''} / スタートアップ
-          </div>
-          <h2 style={{ margin: 0 }}>{startup?.title}</h2>
+      <div>
+        <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '4px' }}>
+          {orgData ? orgData.name : ''} / スタートアップ
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {savingStatus !== 'idle' && (
-            <div style={{
-              padding: '8px 12px',
-              fontSize: '12px',
-              color: savingStatus === 'saving' ? '#6B7280' : '#10B981',
-              backgroundColor: savingStatus === 'saving' ? '#F3F4F6' : '#D1FAE5',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              {savingStatus === 'saving' ? '💾 保存中...' : '✅ 保存完了'}
-            </div>
-          )}
-          <button
-            onClick={onSave}
-            disabled={savingStatus === 'saving'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '40px',
-              height: '40px',
-              backgroundColor: savingStatus === 'saving' ? '#9CA3AF' : '#10B981',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: savingStatus === 'saving' ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.2s, opacity 0.2s',
-              opacity: savingStatus === 'saving' ? 0.7 : 1,
-            }}
-            onMouseEnter={(e) => {
-              if (savingStatus !== 'saving') {
-                e.currentTarget.style.backgroundColor = '#059669';
-                e.currentTarget.style.opacity = '1';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (savingStatus !== 'saving') {
-                e.currentTarget.style.backgroundColor = '#10B981';
-                e.currentTarget.style.opacity = '1';
-              }
-            }}
-            title="編集内容を保存します"
-          >
-            <SaveIcon size={18} color="white" />
-          </button>
-          <button
-            onClick={onDownloadJson}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '40px',
-              height: '40px',
-              backgroundColor: '#3B82F6',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s, opacity 0.2s',
-              opacity: 1,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#2563EB';
-              e.currentTarget.style.opacity = '1';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#3B82F6';
-              e.currentTarget.style.opacity = '1';
-            }}
-            title="JSONファイルをダウンロード"
-          >
-            <DownloadIcon size={18} color="white" />
-          </button>
-          <button
-            onClick={() => {
-              router.push(`/organization/detail?id=${organizationId}&tab=startups`);
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '40px',
-              height: '40px',
-              backgroundColor: '#6B7280',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s, opacity 0.2s',
-              opacity: 0.9,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#4B5563';
-              e.currentTarget.style.opacity = '1';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#6B7280';
-              e.currentTarget.style.opacity = '0.9';
-            }}
-            title="戻る"
-          >
-            <BackIcon size={18} color="white" />
-          </button>
-        </div>
+        <h2 style={{ margin: 0 }}>{startup?.title}</h2>
       </div>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        {savingStatus !== 'idle' && (
+          <div style={{
+            padding: '8px 12px',
+            fontSize: '12px',
+            color: savingStatus === 'saving' ? '#6B7280' : '#10B981',
+            backgroundColor: savingStatus === 'saving' ? '#F3F4F6' : '#D1FAE5',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}>
+            {savingStatus === 'saving' ? '💾 保存中...' : '✅ 保存完了'}
+          </div>
+        )}
+        <button
+          onClick={onSave}
+          disabled={savingStatus === 'saving'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '40px',
+            height: '40px',
+            backgroundColor: savingStatus === 'saving' ? '#9CA3AF' : '#10B981',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: savingStatus === 'saving' ? 'not-allowed' : 'pointer',
+            transition: 'background-color 0.2s, opacity 0.2s',
+            opacity: savingStatus === 'saving' ? 0.7 : 1,
+          }}
+          onMouseEnter={(e) => {
+            if (savingStatus !== 'saving') {
+              e.currentTarget.style.backgroundColor = '#059669';
+              e.currentTarget.style.opacity = '1';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (savingStatus !== 'saving') {
+              e.currentTarget.style.backgroundColor = '#10B981';
+              e.currentTarget.style.opacity = '1';
+            }
+          }}
+          title="編集内容を保存します"
+        >
+          <SaveIcon size={18} color="white" />
+        </button>
+        <button
+          onClick={onDownloadJson}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '40px',
+            height: '40px',
+            backgroundColor: '#3B82F6',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s, opacity 0.2s',
+            opacity: 1,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#2563EB';
+            e.currentTarget.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#3B82F6';
+            e.currentTarget.style.opacity = '1';
+          }}
+          title="JSONファイルをダウンロード"
+        >
+          <DownloadIcon size={18} color="white" />
+        </button>
+        <button
+          onClick={() => {
+            router.push(`/organization/detail?id=${organizationId}&tab=startups`);
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '40px',
+            height: '40px',
+            backgroundColor: '#6B7280',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s, opacity 0.2s',
+            opacity: 0.9,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#4B5563';
+            e.currentTarget.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#6B7280';
+            e.currentTarget.style.opacity = '0.9';
+          }}
+          title="戻る"
+        >
+          <BackIcon size={18} color="white" />
+        </button>
+      </div>
+    </div>
       
       {/* 組織選択ドロップダウン */}
       <div style={{
@@ -275,10 +275,11 @@ export default function StartupPageHeader({
         gap: '12px',
       }}>
         <label style={{
-          fontSize: '13px',
-          fontWeight: '500',
-          color: '#374151',
+          fontSize: '14px',
+          fontWeight: '600',
+          color: '#1A1A1A',
           whiteSpace: 'nowrap',
+          fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}>
           所属組織:
         </label>
@@ -299,23 +300,41 @@ export default function StartupPageHeader({
             disabled={isChangingOrganization || savingStatus === 'saving'}
             style={{
               flex: 1,
-              padding: '8px 12px',
-              border: '1px solid #D1D5DB',
-              borderRadius: '6px',
+              padding: '10px 40px 10px 14px',
+              border: '1.5px solid #E5E7EB',
+              borderRadius: '8px',
               fontSize: '14px',
-              backgroundColor: isChangingOrganization || savingStatus === 'saving' ? '#F3F4F6' : '#FFFFFF',
-              color: '#111827',
+              backgroundColor: isChangingOrganization || savingStatus === 'saving' ? '#F9FAFB' : '#FFFFFF',
+              color: isChangingOrganization || savingStatus === 'saving' ? '#9CA3AF' : (selectValue ? '#1A1A1A' : '#9CA3AF'),
+              fontWeight: selectValue ? '500' : '400',
               cursor: isChangingOrganization || savingStatus === 'saving' ? 'not-allowed' : 'pointer',
               fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              appearance: 'none',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 14px center',
+              transition: 'all 0.2s ease',
+              opacity: isChangingOrganization || savingStatus === 'saving' ? 0.6 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!isChangingOrganization && savingStatus !== 'saving') {
+                e.currentTarget.style.borderColor = '#D1D5DB';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#E5E7EB';
+              e.currentTarget.style.boxShadow = 'none';
             }}
             onFocus={(e) => {
               if (!isChangingOrganization && savingStatus !== 'saving') {
-                e.currentTarget.style.borderColor = '#3B82F6';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                e.currentTarget.style.borderColor = '#4262FF';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 98, 255, 0.1)';
+                e.currentTarget.style.outline = 'none';
               }
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor = '#D1D5DB';
+              e.currentTarget.style.borderColor = '#E5E7EB';
               e.currentTarget.style.boxShadow = 'none';
             }}
           >

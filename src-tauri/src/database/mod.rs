@@ -612,6 +612,8 @@ impl Database {
         let startups_columns_to_add = vec![
             ("evaluationChart", "TEXT"),
             ("evaluationChartSnapshots", "TEXT"),
+            ("competitorComparison", "TEXT"),
+            ("deepSearch", "TEXT"),
             ("assignee", "TEXT"),
             ("method", "TEXT"),
             ("methodOther", "TEXT"),
@@ -988,6 +990,27 @@ impl Database {
             [],
         )?;
         init_log!("✅ bizDevPhasesテーブルを作成しました");
+        
+        // カテゴリー・Biz-Devフェーズスナップショットテーブル
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS categoryBizDevPhaseSnapshots (
+                id TEXT PRIMARY KEY,
+                snapshotDate TEXT NOT NULL,
+                categoryCounts TEXT NOT NULL,
+                bizDevPhaseCounts TEXT NOT NULL,
+                createdAt TEXT NOT NULL,
+                updatedAt TEXT NOT NULL,
+                UNIQUE(snapshotDate)
+            )",
+            [],
+        )?;
+        init_log!("✅ categoryBizDevPhaseSnapshotsテーブルを作成しました");
+        
+        // スナップショットテーブルにインデックスを作成
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_categoryBizDevPhaseSnapshots_date ON categoryBizDevPhaseSnapshots(snapshotDate)",
+            [],
+        )?;
         
         // departmentsテーブルにインデックスを作成
         conn.execute(

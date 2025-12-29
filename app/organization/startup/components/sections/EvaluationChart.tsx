@@ -11,6 +11,7 @@ interface EvaluationChartProps {
   isEditing: boolean;
   onEdit: () => void;
   onSave: () => void;
+  onScoreChange?: (axisId: string, score: number) => void;
 }
 
 const CHART_SIZE = 600;
@@ -42,9 +43,12 @@ export default function EvaluationChart({
   isEditing,
   onEdit,
   onSave,
+  onScoreChange,
 }: EvaluationChartProps) {
   const [showSnapshotModal, setShowSnapshotModal] = React.useState(false);
   const [snapshotName, setSnapshotName] = React.useState('');
+  const [draggingAxisId, setDraggingAxisId] = React.useState<string | null>(null);
+  const svgRef = React.useRef<SVGSVGElement>(null);
 
   // チャートのパスを計算
   const chartPath = useMemo(() => {
@@ -53,7 +57,8 @@ export default function EvaluationChart({
     const points = EVALUATION_AXES.map((axis, index) => {
       const axisData = chartData.axes.find(a => a.id === axis.id);
       const score = axisData?.score || 0;
-      const normalizedScore = (score / MAX_SCORE) * CHART_RADIUS;
+      const maxValue = axisData?.maxValue || MAX_SCORE;
+      const normalizedScore = (score / maxValue) * CHART_RADIUS;
       const angle = (axis.angle * Math.PI) / 180;
       const x = CHART_CENTER + normalizedScore * Math.sin(angle);
       const y = CHART_CENTER - normalizedScore * Math.cos(angle);
@@ -67,7 +72,7 @@ export default function EvaluationChart({
       .join(' ') + ' Z';
 
     return pathData;
-  }, [chartData]);
+  }, [chartData, draggingAxisId]);
 
   // スナップショットのパスを計算
   const snapshotPaths = useMemo(() => {
@@ -263,7 +268,12 @@ export default function EvaluationChart({
             padding: '24px',
             border: '1px solid #E5E7EB'
           }}>
-            <svg width={CHART_SIZE} height={CHART_SIZE} style={{ display: 'block', margin: '0 auto' }}>
+            <svg 
+              ref={svgRef}
+              width={CHART_SIZE} 
+              height={CHART_SIZE} 
+              style={{ display: 'block', margin: '0 auto', userSelect: 'none' }}
+            >
               {/* グリッド線 */}
               {[1, 2, 3, 4, 5].map(level => {
                 const radius = (level / MAX_SCORE) * CHART_RADIUS;
@@ -347,17 +357,81 @@ export default function EvaluationChart({
                     const axisData = chartData.axes.find(a => a.id === axis.id);
                     if (!axisData) return null;
                     const score = axisData.score || 0;
-                    const normalizedScore = (score / MAX_SCORE) * CHART_RADIUS;
+                    const maxValue = axisData.maxValue || MAX_SCORE;
+                    const normalizedScore = (score / maxValue) * CHART_RADIUS;
                     const angle = (axis.angle * Math.PI) / 180;
                     const x = CHART_CENTER + normalizedScore * Math.sin(angle);
                     const y = CHART_CENTER - normalizedScore * Math.cos(angle);
+                    const isDragging = draggingAxisId === axis.id;
+                    
+                    const handleMouseDown = (e: React.MouseEvent<SVGCircleElement>) => {
+                      if (!onScoreChange || !svgRef.current) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDraggingAxisId(axis.id);
+                      
+                      const axisAngleRad = (axis.angle * Math.PI) / 180;
+                      
+                      const handleMouseMove = (moveEvent: MouseEvent) => {
+                        if (!svgRef.current) return;
+                        const rect = svgRef.current.getBoundingClientRect();
+                        const svgX = moveEvent.clientX - rect.left;
+                        const svgY = moveEvent.clientY - rect.top;
+                        
+                        // 中心からの距離と角度を計算
+                        const dx = svgX - CHART_CENTER;
+                        const dy = svgY - CHART_CENTER;
+                        const mouseAngleRad = Math.atan2(dx, -dy);
+                        
+                        // 軸の角度に投影（軸方向の距離を計算）
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const angleDiff = mouseAngleRad - axisAngleRad;
+                        const projectedDistance = distance * Math.cos(angleDiff);
+                        
+                        // 距離をスコアに変換（最大値で正規化、CHART_RADIUSを超えないように）
+                        const clampedDistance = Math.min(Math.max(projectedDistance, 0), CHART_RADIUS);
+                        const newScore = (clampedDistance / CHART_RADIUS) * maxValue;
+                        
+                        // スコアを更新（小数点第1位まで）
+                        onScoreChange(axis.id, Math.round(newScore * 10) / 10);
+                      };
+                      
+                      const handleMouseUp = () => {
+                        setDraggingAxisId(null);
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    };
+                    
                     return (
                       <circle
                         key={axis.id}
                         cx={x}
                         cy={y}
-                        r="4"
-                        fill="#3B82F6"
+                        r={isDragging ? "8" : "6"}
+                        fill={isDragging ? "#2563EB" : "#3B82F6"}
+                        stroke="#FFFFFF"
+                        strokeWidth="2"
+                        style={{
+                          cursor: onScoreChange ? 'grab' : 'default',
+                          transition: isDragging ? 'none' : 'all 0.2s ease',
+                        }}
+                        onMouseDown={onScoreChange ? handleMouseDown : undefined}
+                        onMouseEnter={(e) => {
+                          if (onScoreChange && !isDragging) {
+                            e.currentTarget.setAttribute('r', '8');
+                            e.currentTarget.setAttribute('fill', '#2563EB');
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isDragging) {
+                            e.currentTarget.setAttribute('r', '6');
+                            e.currentTarget.setAttribute('fill', '#3B82F6');
+                          }
+                        }}
                       />
                     );
                   })}

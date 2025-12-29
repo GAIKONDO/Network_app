@@ -388,7 +388,12 @@ export function useStartupData(
           title: startupData.title,
         });
         setStartup(startupData);
-        console.log('✅ [ページ] setStartup呼び出し後');
+        console.log('✅ [ページ] setStartup呼び出し後:', {
+          startupId: startupData.id,
+          hasCompetitorComparison: !!startupData.competitorComparison,
+          competitorComparisonId: startupData.competitorComparison?.id,
+          competitorComparisonAxesCount: startupData.competitorComparison?.axes?.length || 0,
+        });
         
         // ローカル状態を初期化
         const assigneeValue = startupData.assignee

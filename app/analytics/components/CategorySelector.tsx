@@ -65,12 +65,12 @@ export default function CategorySelector({
             e.stopPropagation();
             toggleCategory(category.id);
           }}
-          style={{
+        style={{
             padding: '8px 12px',
             paddingLeft: `${12 + indent}px`,
-            fontSize: '14px',
-            fontWeight: isSelected ? '600' : '400',
-            color: isSelected ? '#4262FF' : '#1A1A1A',
+          fontSize: '14px',
+          fontWeight: isSelected ? '600' : '400',
+          color: isSelected ? '#4262FF' : '#1A1A1A',
             backgroundColor: isSelected ? '#E3F2FD' : 'transparent',
             cursor: 'pointer',
             transition: 'all 0.15s',
@@ -224,13 +224,13 @@ export default function CategorySelector({
               color: '#6B7280',
               backgroundColor: '#FFFFFF',
               border: '1px solid #E0E0E0',
-              borderRadius: '8px',
-              cursor: 'pointer',
+          borderRadius: '8px',
+          cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               transition: 'all 150ms',
-              fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               flexShrink: 0,
             }}
             onMouseEnter={(e) => {
@@ -270,22 +270,22 @@ export default function CategorySelector({
             border: '1.5px solid #E0E0E0',
             borderRadius: '8px',
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
             transition: 'all 150ms',
             fontFamily: 'var(--font-inter), var(--font-noto), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             flexShrink: 0,
-          }}
-          onMouseEnter={(e) => {
+        }}
+        onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#C4C4C4';
             e.currentTarget.style.backgroundColor = '#F5F5F5';
-          }}
-          onMouseLeave={(e) => {
+        }}
+        onMouseLeave={(e) => {
             e.currentTarget.style.borderColor = '#E0E0E0';
             e.currentTarget.style.backgroundColor = '#FFFFFF';
-          }}
-        >
+        }}
+      >
           <svg
             width="16"
             height="16"
@@ -305,7 +305,7 @@ export default function CategorySelector({
             />
           </svg>
           <span>カテゴリーを選択</span>
-        </button>
+      </button>
       </div>
 
       {isOpen && (
@@ -330,30 +330,30 @@ export default function CategorySelector({
               e.stopPropagation();
               onSelect([]);
             }}
-            style={{
+        style={{
               padding: '8px 12px',
-              fontSize: '14px',
+          fontSize: '14px',
               fontWeight: selectedCategoryIds.length === 0 ? '600' : '400',
               color: selectedCategoryIds.length === 0 ? '#4262FF' : '#1A1A1A',
               backgroundColor: selectedCategoryIds.length === 0 ? '#E3F2FD' : 'transparent',
-              cursor: 'pointer',
+          cursor: 'pointer',
               transition: 'all 0.15s',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               borderBottom: '1px solid #F0F0F0',
-            }}
-            onMouseEnter={(e) => {
+        }}
+        onMouseEnter={(e) => {
               if (selectedCategoryIds.length > 0) {
                 e.currentTarget.style.backgroundColor = '#F5F5F5';
-              }
-            }}
-            onMouseLeave={(e) => {
+          }
+        }}
+        onMouseLeave={(e) => {
               if (selectedCategoryIds.length > 0) {
                 e.currentTarget.style.backgroundColor = 'transparent';
-              }
-            }}
-          >
+          }
+        }}
+      >
             <div
               style={{
                 width: '16px',
