@@ -2170,8 +2170,28 @@ export function CategorySection({
                     </div>
                     
                     {/* Biz-Devフェーズごとにセクション分け */}
-                    {Array.from(getSelectedCategoryStartupsByBizDevPhase.entries()).map(([phaseId, { phase, startups }]) => (
-                      <div key={phaseId} style={{ marginBottom: '32px' }}>
+                    {(() => {
+                      // orderedBizDevPhasesの順序に従ってソート
+                      const entries = Array.from(getSelectedCategoryStartupsByBizDevPhase.entries());
+                      const sortedEntries = entries.sort(([phaseIdA], [phaseIdB]) => {
+                        // Biz-Devフェーズ未設定は最後に
+                        if (phaseIdA === 'no-phase') return 1;
+                        if (phaseIdB === 'no-phase') return -1;
+                        
+                        // orderedBizDevPhasesの順序に従ってソート
+                        const indexA = orderedBizDevPhases.findIndex(p => p.id === phaseIdA);
+                        const indexB = orderedBizDevPhases.findIndex(p => p.id === phaseIdB);
+                        
+                        // どちらもorderedBizDevPhasesにない場合は元の順序を維持
+                        if (indexA === -1 && indexB === -1) return 0;
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        
+                        return indexA - indexB;
+                      });
+                      
+                      return sortedEntries.map(([phaseId, { phase, startups }]) => (
+                        <div key={phaseId} style={{ marginBottom: '32px' }}>
                         <h5 style={{
                           fontSize: '15px',
                           fontWeight: '600',
@@ -2256,7 +2276,8 @@ export function CategorySection({
                           ))}
                         </div>
                       </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 )}
               </div>

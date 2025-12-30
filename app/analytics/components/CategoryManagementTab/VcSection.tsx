@@ -1310,8 +1310,28 @@ export function VcSection({
                       </button>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                      {Array.from(getSelectedVcStartupsByBizDevPhase.entries()).map(([phaseId, { phase, startups: phaseStartups }]) => (
-                        <div key={phaseId}>
+                      {(() => {
+                        // orderedBizDevPhasesの順序に従ってソート
+                        const entries = Array.from(getSelectedVcStartupsByBizDevPhase.entries());
+                        const sortedEntries = entries.sort(([phaseIdA], [phaseIdB]) => {
+                          // Biz-Devフェーズ未設定は最後に
+                          if (phaseIdA === 'no-phase') return 1;
+                          if (phaseIdB === 'no-phase') return -1;
+                          
+                          // orderedBizDevPhasesの順序に従ってソート
+                          const indexA = orderedBizDevPhases.findIndex(p => p.id === phaseIdA);
+                          const indexB = orderedBizDevPhases.findIndex(p => p.id === phaseIdB);
+                          
+                          // どちらもorderedBizDevPhasesにない場合は元の順序を維持
+                          if (indexA === -1 && indexB === -1) return 0;
+                          if (indexA === -1) return 1;
+                          if (indexB === -1) return -1;
+                          
+                          return indexA - indexB;
+                        });
+                        
+                        return sortedEntries.map(([phaseId, { phase, startups: phaseStartups }]) => (
+                          <div key={phaseId}>
                           <div style={{
                             marginBottom: '16px',
                             paddingBottom: '12px',
@@ -1396,7 +1416,8 @@ export function VcSection({
                             ))}
                           </div>
                         </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   </div>
                 )}
