@@ -1235,30 +1235,54 @@ export function DepartmentSection({
                       // VegaChartのクリックイベントを処理
                       console.log('DepartmentSection onSignal:', signalName, value);
                       if (signalName === 'clicked_theme' || signalName === 'click') {
+                        let departmentId: string | null = null;
+                        
                         // value.datumから部署情報を取得
                         if (value && value.datum) {
                           const datum = value.datum;
                           console.log('DepartmentSection datum:', datum);
-                          // 部署 IDがある場合は直接使用、なければ部署名から検索
                           if (datum.departmentId) {
-                            console.log('Setting selectedBarDepartmentId from datum.departmentId:', datum.departmentId);
-                            setSelectedBarDepartmentId(datum.departmentId);
+                            // 配列の場合は最初の要素を取得
+                            departmentId = Array.isArray(datum.departmentId) ? datum.departmentId[0] : datum.departmentId;
                           } else if (datum.department) {
                             const clickedDept = departments.find(dept => dept.title === datum.department);
                             if (clickedDept) {
-                              console.log('Setting selectedBarDepartmentId from datum.department:', clickedDept.id);
-                              setSelectedBarDepartmentId(clickedDept.id);
+                              departmentId = clickedDept.id;
                             }
                           }
-                        } else if (value && value.departmentId) {
-                          console.log('Setting selectedBarDepartmentId from value.departmentId:', value.departmentId);
-                          setSelectedBarDepartmentId(value.departmentId);
-                        } else if (value && value.department) {
+                        }
+                        // value.departmentIdから取得（配列の場合も対応）
+                        else if (value && value.departmentId) {
+                          departmentId = Array.isArray(value.departmentId) ? value.departmentId[0] : value.departmentId;
+                        }
+                        // value.vlPointから取得（Vega-Liteのポイントデータ）
+                        else if (value && value.vlPoint) {
+                          const point = value.vlPoint;
+                          if (point.datum) {
+                            const datum = point.datum;
+                            if (datum.departmentId) {
+                              departmentId = Array.isArray(datum.departmentId) ? datum.departmentId[0] : datum.departmentId;
+                            } else if (datum.department) {
+                              const clickedDept = departments.find(dept => dept.title === datum.department);
+                              if (clickedDept) {
+                                departmentId = clickedDept.id;
+                              }
+                            }
+                          }
+                        }
+                        // value.departmentから取得
+                        else if (value && value.department) {
                           const clickedDept = departments.find(dept => dept.title === value.department);
                           if (clickedDept) {
-                            console.log('Setting selectedBarDepartmentId from value.department:', clickedDept.id);
-                            setSelectedBarDepartmentId(clickedDept.id);
+                            departmentId = clickedDept.id;
                           }
+                        }
+                        
+                        if (departmentId) {
+                          console.log('Setting selectedBarDepartmentId:', departmentId);
+                          setSelectedBarDepartmentId(departmentId);
+                        } else {
+                          console.warn('DepartmentSection: Could not find departmentId from value:', value);
                         }
                       }
                     }}
@@ -1266,7 +1290,7 @@ export function DepartmentSection({
                 </div>
                 
                 {/* 選択された部署のスタートアップ一覧 */}
-                {selectedBarDepartmentId && getSelectedDepartmentStartups.length > 0 && (
+                {selectedBarDepartmentId && (
                   <div style={{ marginTop: '32px' }}>
                     <div style={{
                       marginBottom: '16px',
@@ -1318,94 +1342,109 @@ export function DepartmentSection({
                         閉じる
                       </button>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                      {Array.from(getSelectedDepartmentStartupsByBizDevPhase.entries()).map(([phaseId, { phase, startups: phaseStartups }]) => (
-                        <div key={phaseId}>
-                          <div style={{
-                            marginBottom: '16px',
-                            paddingBottom: '12px',
-                            borderBottom: '2px solid #E5E7EB',
-                          }}>
-                            <h5 style={{
-                              fontSize: '16px',
-                              fontWeight: '600',
-                              color: '#1A1A1A',
-                              margin: 0,
-                              fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                    {getSelectedDepartmentStartups.length === 0 ? (
+                      <div style={{
+                        padding: '40px',
+                        textAlign: 'center',
+                        backgroundColor: '#F9FAFB',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        color: '#6B7280',
+                        fontSize: '14px',
+                        fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                      }}>
+                        該当するスタートアップはありません。
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                        {Array.from(getSelectedDepartmentStartupsByBizDevPhase.entries()).map(([phaseId, { phase, startups: phaseStartups }]) => (
+                          <div key={phaseId}>
+                            <div style={{
+                              marginBottom: '16px',
+                              paddingBottom: '12px',
+                              borderBottom: '2px solid #E5E7EB',
                             }}>
-                              {phase ? phase.title : 'Biz-Devフェーズ未設定'}
-                              <span style={{
-                                marginLeft: '8px',
-                                fontSize: '14px',
-                                fontWeight: '400',
-                                color: '#6B7280',
+                              <h5 style={{
+                                fontSize: '16px',
+                                fontWeight: '600',
+                                color: '#1A1A1A',
+                                margin: 0,
+                                fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
                               }}>
-                                ({phaseStartups.length}件)
-                              </span>
-                            </h5>
-                          </div>
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                            gap: '16px',
-                          }}>
-                            {phaseStartups.map((startup) => (
-                              <div
-                                key={startup.id}
-                                onClick={() => {
-                                  if (startup.organizationId && startup.id) {
-                                    router.push(`/organization/startup?organizationId=${startup.organizationId}&startupId=${startup.id}`);
-                                  }
-                                }}
-                                style={{
-                                  padding: '16px',
-                                  backgroundColor: '#FFFFFF',
-                                  border: '1px solid #E5E7EB',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#F9FAFB';
-                                  e.currentTarget.style.borderColor = '#3B82F6';
-                                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                                  e.currentTarget.style.transform = 'translateY(-2px)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#FFFFFF';
-                                  e.currentTarget.style.borderColor = '#E5E7EB';
-                                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                                  e.currentTarget.style.transform = 'translateY(0)';
-                                }}
-                              >
-                                <h5 style={{
-                                  fontSize: '16px',
-                                  fontWeight: '600',
-                                  color: '#1A1A1A',
-                                  margin: '0 0 8px 0',
-                                  fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                                {phase ? phase.title : 'Biz-Devフェーズ未設定'}
+                                <span style={{
+                                  marginLeft: '8px',
+                                  fontSize: '14px',
+                                  fontWeight: '400',
+                                  color: '#6B7280',
                                 }}>
-                                  {startup.title}
-                                </h5>
-                                {startup.createdAt && (() => {
-                                  const formattedDate = formatStartupDate(startup.createdAt);
-                                  return formattedDate ? (
-                                    <div style={{
-                                      fontSize: '12px',
-                                      color: '#9CA3AF',
-                                      marginTop: '8px',
-                                    }}>
-                                      作成日: {formattedDate}
-                                    </div>
-                                  ) : null;
-                                })()}
-                              </div>
-                            ))}
+                                  ({phaseStartups.length}件)
+                                </span>
+                              </h5>
+                            </div>
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                              gap: '16px',
+                            }}>
+                              {phaseStartups.map((startup) => (
+                                <div
+                                  key={startup.id}
+                                  onClick={() => {
+                                    if (startup.organizationId && startup.id) {
+                                      router.push(`/organization/startup?organizationId=${startup.organizationId}&startupId=${startup.id}`);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '16px',
+                                    backgroundColor: '#FFFFFF',
+                                    border: '1px solid #E5E7EB',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#F9FAFB';
+                                    e.currentTarget.style.borderColor = '#3B82F6';
+                                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                                    e.currentTarget.style.borderColor = '#E5E7EB';
+                                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  <h5 style={{
+                                    fontSize: '16px',
+                                    fontWeight: '600',
+                                    color: '#1A1A1A',
+                                    margin: '0 0 8px 0',
+                                    fontFamily: 'var(--font-inter), var(--font-noto), sans-serif',
+                                  }}>
+                                    {startup.title}
+                                  </h5>
+                                  {startup.createdAt && (() => {
+                                    const formattedDate = formatStartupDate(startup.createdAt);
+                                    return formattedDate ? (
+                                      <div style={{
+                                        fontSize: '12px',
+                                        color: '#9CA3AF',
+                                        marginTop: '8px',
+                                      }}>
+                                        作成日: {formattedDate}
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
