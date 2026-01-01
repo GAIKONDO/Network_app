@@ -7,6 +7,7 @@ import type { KnowledgeGraphSearchResult, SearchFilters } from './types';
 import { searchEntities } from './searchEntities';
 import { searchRelations } from './searchRelations';
 import { searchTopics } from './searchTopics';
+import { searchMeetingNotes } from './searchMeetingNotes';
 import { adjustWeightsForQuery, DEFAULT_WEIGHTS } from '../ragSearchScoring';
 import { type HybridSearchConfig, DEFAULT_HYBRID_CONFIG } from './hybridSearch';
 import { analyzeQuery, getSearchStrategy, logQueryAnalysis, type QueryAnalysis } from './queryRouter';
@@ -72,8 +73,8 @@ export async function searchKnowledgeGraph(
     // クエリに基づいて重みを調整
     const weights = adjustWeightsForQuery(normalizedQuery, DEFAULT_WEIGHTS);
 
-    // 各タイプごとの検索数を計算（limitを3等分）
-    const perTypeLimit = Math.max(1, Math.ceil(limit / 3));
+    // 各タイプごとの検索数を計算（limitを4等分：entities, relations, topics, meetingNotes）
+    const perTypeLimit = Math.max(1, Math.ceil(limit / 4));
 
     // クエリルーターを使用する場合、クエリを分析して検索戦略を決定
     let entityHybridConfig: HybridSearchConfig | undefined;
@@ -124,7 +125,7 @@ export async function searchKnowledgeGraph(
       topicHybridConfig: finalTopicHybridConfig,
     });
     
-    const [entityResults, relationResults, topicResults] = await Promise.all([
+    const [entityResults, relationResults, topicResults, meetingNoteResults] = await Promise.all([
       // エンティティ検索
       searchEntities(normalizedQuery, perTypeLimit, filters, weights, finalEntityHybridConfig).catch(error => {
         console.error('[searchKnowledgeGraph] エンティティ検索エラー:', error);
@@ -141,6 +142,12 @@ export async function searchKnowledgeGraph(
       searchTopics(normalizedQuery, perTypeLimit, filters, weights, finalTopicHybridConfig).catch(error => {
         console.error('[searchKnowledgeGraph] トピック検索エラー:', error);
         return [] as KnowledgeGraphSearchResult[];
+      }),
+      
+      // 議事録検索
+      searchMeetingNotes(normalizedQuery, perTypeLimit, filters, weights).catch(error => {
+        console.error('[searchKnowledgeGraph] 議事録検索エラー:', error);
+        return [] as KnowledgeGraphSearchResult[];
       })
     ]);
     
@@ -148,6 +155,7 @@ export async function searchKnowledgeGraph(
       entityCount: entityResults.length,
       relationCount: relationResults.length,
       topicCount: topicResults.length,
+      meetingNoteCount: meetingNoteResults.length,
     });
 
     // 結果を統合
@@ -155,11 +163,14 @@ export async function searchKnowledgeGraph(
       ...entityResults,
       ...relationResults,
       ...topicResults,
+      ...meetingNoteResults,
     ];
 
     console.log('[searchKnowledgeGraph] 検索結果:', {
       entityCount: entityResults.length,
       relationCount: relationResults.length,
+      topicCount: topicResults.length,
+      meetingNoteCount: meetingNoteResults.length,
       totalCount: allResults.length,
     });
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getAvailableOllamaModels } from '@/lib/pageGeneration';
+import { getAvailableLFM2Models } from '@/lib/localModel/getAvailableLFM2Models';
 import type { ModelType, ModelInfo } from '../types';
 import { GPT_MODELS, GEMINI_MODELS, CLAUDE_MODELS, DEFAULT_MODEL, DEFAULT_MODEL_TYPE } from '../constants';
 
@@ -22,7 +23,9 @@ export function useModelSelector() {
 
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [localModels, setLocalModels] = useState<ModelInfo[]>([]);
+  const [lfm2Models, setLfm2Models] = useState<ModelInfo[]>([]);
   const [loadingLocalModels, setLoadingLocalModels] = useState(false);
+  const [loadingLFM2Models, setLoadingLFM2Models] = useState(false);
   const modelSelectorRef = useRef<HTMLDivElement>(null);
 
   // モデルタイプが変更されたら、デフォルトモデルを設定
@@ -42,9 +45,15 @@ export function useModelSelector() {
         setSelectedModel(localModels[0].value);
         localStorage.setItem('aiAssistantSelectedModel', localModels[0].value);
       }
+    } else if (modelType === 'local-lfm') {
+      // LFM2モデルが読み込まれたら最初のモデルを選択
+      if (lfm2Models.length > 0) {
+        setSelectedModel(lfm2Models[0].value);
+        localStorage.setItem('aiAssistantSelectedModel', lfm2Models[0].value);
+      }
     }
     localStorage.setItem('aiAssistantModelType', modelType);
-  }, [modelType, localModels]);
+  }, [modelType, localModels, lfm2Models]);
 
   // 選択されたモデルが変更されたら保存
   useEffect(() => {
@@ -57,6 +66,8 @@ export function useModelSelector() {
   useEffect(() => {
     if (modelType === 'local' && showModelSelector) {
       loadAvailableLocalModels();
+    } else if (modelType === 'local-lfm' && showModelSelector) {
+      loadAvailableLFM2Models();
     }
   }, [modelType, showModelSelector]);
 
@@ -122,10 +133,39 @@ export function useModelSelector() {
     }
   }, [showModelSelector]);
 
+  // LFM2モデルのみを取得
+  const loadAvailableLFM2Models = async () => {
+    setLoadingLFM2Models(true);
+    try {
+      const models = await getAvailableLFM2Models();
+      if (models.length > 0) {
+        const formattedModels = models.map(model => ({
+          value: model.model,
+          label: model.name,
+          inputPrice: '無料',
+          outputPrice: '無料',
+        }));
+        setLfm2Models(formattedModels);
+        // 最初のモデルを選択
+        if (formattedModels.length > 0 && !selectedModel.startsWith('gpt')) {
+          setSelectedModel(formattedModels[0].value);
+        }
+      } else {
+        setLfm2Models([]);
+      }
+    } catch (error) {
+      console.error('LFM2モデルの取得エラー:', error);
+      setLfm2Models([]);
+    } finally {
+      setLoadingLFM2Models(false);
+    }
+  };
+
   const availableModels = 
     modelType === 'gpt' ? GPT_MODELS :
     modelType === 'gemini' ? GEMINI_MODELS :
     modelType === 'claude' ? CLAUDE_MODELS :
+    modelType === 'local-lfm' ? lfm2Models :
     localModels;
 
   return {
@@ -136,7 +176,7 @@ export function useModelSelector() {
     showModelSelector,
     setShowModelSelector,
     availableModels,
-    loadingLocalModels,
+    loadingLocalModels: loadingLocalModels || loadingLFM2Models,
     modelSelectorRef,
   };
 }

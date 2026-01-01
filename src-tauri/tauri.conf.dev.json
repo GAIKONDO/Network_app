@@ -1,22 +1,22 @@
 {
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:3020"
+    "devUrl": "http://localhost:3015"
   },
   "app": {
     "windows": [
       {
-        "title": "Network",
+        "title": "Demo App Local",
         "width": 1400,
         "height": 900,
         "resizable": true,
         "fullscreen": false,
         "devtools": true,
-        "url": "http://localhost:3020"
+        "url": "http://localhost:3015"
       }
     ],
     "security": {
-      "csp": "default-src 'self' http://localhost:3020; connect-src 'self' http://localhost:3020 http://localhost:3010 http://localhost:11434 http://127.0.0.1:3020 http://127.0.0.1:3010 http://127.0.0.1:11434 ws://localhost:* ws://127.0.0.1:* https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://*.ollama.ai; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:3020; style-src 'self' 'unsafe-inline' http://localhost:3020; img-src 'self' data: https: file: http://localhost:3020; font-src 'self' data: http://localhost:3020;"
+      "csp": "default-src 'self' http://localhost:3015; connect-src 'self' http://localhost:3015 http://localhost:3010 http://localhost:11434 http://127.0.0.1:3015 http://127.0.0.1:3010 http://127.0.0.1:11434 ws://localhost:* ws://127.0.0.1:* https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://*.ollama.ai; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:3015; style-src 'self' 'unsafe-inline' http://localhost:3015; img-src 'self' data: https: file: http://localhost:3015; font-src 'self' data: http://localhost:3015;"
     }
   },
   "bundle": {

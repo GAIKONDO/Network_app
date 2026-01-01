@@ -454,9 +454,9 @@ fn get_default_chromadb_data_dir() -> Result<PathBuf, String> {
     // ユーザーのホームディレクトリから取得を試みる
     if let Some(home_dir) = dirs::home_dir() {
         let db_dir_name = if cfg!(debug_assertions) {
-            "network-mock-local-dev"
+            "demo-app-local-dev"
         } else {
-            "network-mock-local"
+            "demo-app-local"
         };
         #[cfg(target_os = "macos")]
         {
@@ -507,7 +507,7 @@ pub async fn init_chromadb_server(data_dir: PathBuf, port: u16) -> Result<(), St
     
     // MutexGuardをdropしてから.awaitする必要がある
     let should_init = {
-        let mut server_guard = server_lock.lock().unwrap();
+        let server_guard = server_lock.lock().unwrap();
         if server_guard.is_some() {
             eprintln!("⚠️ ChromaDB Serverは既に初期化されています");
             return Ok(());
@@ -1530,7 +1530,7 @@ pub async fn save_topic_embedding(
     regulation_id: Option<String>,
 ) -> Result<(), String> {
     let parent_id = meeting_note_id.as_ref().or(regulation_id.as_ref());
-    let parent_id_str = parent_id.map(|s| s.as_str()).unwrap_or("unknown");
+    let _parent_id_str = parent_id.map(|s| s.as_str()).unwrap_or("unknown");
     eprintln!("[save_topic_embedding] 開始: topicId={}, meetingNoteId={:?}, regulationId={:?}, organizationId={}, embedding_dim={}", 
         topic_id, meeting_note_id, regulation_id, organization_id, combined_embedding.len());
     
@@ -2121,19 +2121,14 @@ pub async fn find_similar_design_docs(
         let mut filter = serde_json::Map::new();
         filter.insert("sectionId".to_string(), Value::String(sid));
         where_metadata = Some(filter);
-    } else if let Some(tags_vec) = tags {
-        // タグフィルター（ChromaDBでは$in演算子を使用）
-        // タグはJSON文字列として保存されているため、完全一致で検索
-        // 注意: ChromaDBのメタデータフィルターは完全一致のみサポート
-        // タグの部分一致は検索後にフィルタリングする必要がある
-        if !tags_vec.is_empty() {
-            // 最初のタグでフィルタリング（簡易実装）
-            // 完全な実装には検索後のフィルタリングが必要
-            let mut filter = serde_json::Map::new();
+        } else if let Some(_tags_vec) = tags {
+            // タグフィルター（ChromaDBでは$in演算子を使用）
+            // タグはJSON文字列として保存されているため、完全一致で検索
+            // 注意: ChromaDBのメタデータフィルターは完全一致のみサポート
+            // タグの部分一致は検索後にフィルタリングする必要がある
             // タグはJSON文字列として保存されているため、直接フィルタリングは困難
             // 検索後にフィルタリングする方が実用的
         }
-    }
     
     // includeオプションでdistancesのみを指定（メタデータを除外してnull値の問題を回避）
     // 注意: ChromaDBでは"ids"は常に返されるため、includeオプションには含めない
@@ -2391,12 +2386,14 @@ pub async fn delete_organization_collections(
             "topics_all".to_string(),
             "entities_all".to_string(),
             "relations_all".to_string(),
+            "meetingNotes_all".to_string(),
         ]
     } else {
         vec![
             format!("topics_{}", organization_id),
             format!("entities_{}", organization_id),
             format!("relations_{}", organization_id),
+            format!("meetingNotes_{}", organization_id),
         ]
     };
     
@@ -2419,4 +2416,278 @@ pub async fn delete_organization_collections(
     }
     
     Ok(())
+}
+
+/// 議事録検索結果（メタデータを含む）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeetingNoteSearchResult {
+    pub meeting_note_id: String,
+    pub similarity: f32,
+    pub title: String,
+    pub organization_id: Option<String>,
+}
+
+/// 議事録埋め込みを保存
+pub async fn save_meeting_note_embedding(
+    meeting_note_id: String,
+    organization_id: String,
+    combined_embedding: Vec<f32>,
+    metadata: HashMap<String, Value>,
+) -> Result<(), String> {
+    // クライアントが初期化されていない場合、自動的に初期化を試みる
+    if CHROMADB_CLIENT.get().is_none() {
+        eprintln!("⚠️ ChromaDBクライアントが初期化されていません。自動初期化を試みます...");
+        
+        let server_lock = CHROMADB_SERVER.get();
+        let port = if let Some(server_lock) = server_lock {
+            let port_opt = {
+                let server_guard = server_lock.lock().unwrap();
+                server_guard.as_ref().map(|server| server.port())
+            };
+            
+            if let Some(port) = port_opt {
+                port
+            } else {
+                let port = std::env::var("CHROMADB_PORT")
+                    .ok()
+                    .and_then(|s| s.parse::<u16>().ok())
+                    .unwrap_or(8001);
+                let data_dir = get_default_chromadb_data_dir()?;
+                match init_chromadb_server(data_dir, port).await {
+                    Ok(_) => {
+                        eprintln!("✅ ChromaDBサーバーの自動起動に成功しました");
+                        port
+                    }
+                    Err(e) => {
+                        return Err(format!("ChromaDBサーバーの起動に失敗しました: {}", e));
+                    }
+                }
+            }
+        } else {
+            let port = std::env::var("CHROMADB_PORT")
+                .ok()
+                .and_then(|s| s.parse::<u16>().ok())
+                .unwrap_or(8000);
+            let data_dir = get_default_chromadb_data_dir()?;
+            match init_chromadb_server(data_dir, port).await {
+                Ok(_) => {
+                    eprintln!("✅ ChromaDBサーバーの自動起動に成功しました");
+                    port
+                }
+                Err(e) => {
+                    return Err(format!("ChromaDBサーバーの起動に失敗しました: {}", e));
+                }
+            }
+        };
+        
+        if CHROMADB_CLIENT.get().is_none() {
+            if let Err(e) = init_chromadb_client(port).await {
+                return Err(format!("ChromaDBクライアントが初期化されていません: {}", e));
+            }
+            eprintln!("✅ ChromaDBクライアントの自動初期化に成功しました");
+        }
+    }
+    
+    let client_lock = get_chromadb_client()?;
+    let collection_name = if organization_id.is_empty() {
+        "meetingNotes_all".to_string()
+    } else {
+        format!("meetingNotes_{}", organization_id)
+    };
+    
+    let client = {
+        let client_guard = client_lock.lock().await;
+        client_guard.as_ref()
+            .ok_or("ChromaDBクライアントが初期化されていません")?
+            .clone()
+    };
+    
+    let collection = get_or_create_collection_with_error_handling(client, &collection_name).await?;
+    
+    // メタデータを準備
+    let mut chroma_metadata = serde_json::Map::new();
+    for (k, v) in metadata {
+        chroma_metadata.insert(k, v);
+    }
+    
+    eprintln!("[save_meeting_note_embedding] 埋め込みを保存中... (embedding_dim={})", combined_embedding.len());
+    let entries = CollectionEntries {
+        ids: vec![meeting_note_id.as_str()],
+        embeddings: Some(vec![combined_embedding]),
+        metadatas: Some(vec![chroma_metadata]),
+        documents: None,
+    };
+    
+    collection.upsert(entries, None).await
+        .map_err(|e| {
+            let error_msg = format!("議事録埋め込みの保存に失敗しました: {}", e);
+            eprintln!("[save_meeting_note_embedding] ❌ エラー: {}", error_msg);
+            error_msg
+        })?;
+    
+    eprintln!("[save_meeting_note_embedding] ✅ 成功: meetingNoteId={}", meeting_note_id);
+    Ok(())
+}
+
+/// 単一のコレクションから類似議事録を検索（ヘルパー関数）
+async fn search_meeting_notes_in_collection(
+    client: Arc<ChromaClient>,
+    collection_name: &str,
+    query_embedding: Vec<f32>,
+    limit: usize,
+) -> Result<Vec<MeetingNoteSearchResult>, String> {
+    let collection = match get_or_create_collection_with_error_handling(client, collection_name).await {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[search_meeting_notes_in_collection] ⚠️ コレクション取得エラー（スキップ）: {} - {}", collection_name, e);
+            return Ok(Vec::new());
+        }
+    };
+    
+    let query_options = QueryOptions {
+        query_texts: None,
+        query_embeddings: Some(vec![query_embedding]),
+        where_metadata: None,
+        where_document: None,
+        n_results: Some(limit),
+        include: Some(vec!["distances", "metadatas"]),
+    };
+    
+    let results = collection.query(query_options, None).await
+        .map_err(|e| format!("議事録検索に失敗しました: {}", e))?;
+    
+    let mut search_results = Vec::new();
+    
+    if !results.ids.is_empty() {
+        if let Some(distances) = &results.distances {
+            if !distances.is_empty() {
+                if let Some(id_vec) = results.ids.get(0) {
+                    if let Some(distance_vec) = distances.get(0) {
+                        if let Some(metadatas_vec) = &results.metadatas {
+                            if let Some(metadatas) = metadatas_vec.get(0) {
+                                for (i, meeting_note_id) in id_vec.iter().enumerate() {
+                                    if let Some(distance) = distance_vec.get(i) {
+                                        let distance_f32: f32 = *distance;
+                                        let similarity = (1.0_f32 - distance_f32).max(0.0_f32);
+                                        
+                                        let metadata = metadatas
+                                            .get(i)
+                                            .and_then(|m_opt| m_opt.as_ref());
+                                        
+                                        // メタデータからtitleとorganizationIdを取得
+                                        let title = metadata
+                                            .and_then(|m| {
+                                                m.get("title")
+                                                    .and_then(|v| v.as_str())
+                                            })
+                                            .unwrap_or("")
+                                            .to_string();
+                                        
+                                        let organization_id = metadata
+                                            .and_then(|m| {
+                                                m.get("organizationId")
+                                                    .and_then(|v| v.as_str())
+                                                    .map(|s| s.to_string())
+                                            });
+                                        
+                                        search_results.push(MeetingNoteSearchResult {
+                                            meeting_note_id: meeting_note_id.clone(),
+                                            similarity,
+                                            title,
+                                            organization_id,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(search_results)
+}
+
+/// 類似議事録を検索（組織横断検索対応）
+pub async fn find_similar_meeting_notes(
+    query_embedding: Vec<f32>,
+    limit: usize,
+    organization_id: Option<String>,
+) -> Result<Vec<MeetingNoteSearchResult>, String> {
+    eprintln!("[find_similar_meeting_notes] 検索開始: organizationId={:?}, limit={}, embedding_dim={}", 
+        organization_id, limit, query_embedding.len());
+    
+    let client_lock = get_chromadb_client()?;
+    
+    let client = {
+        let client_guard = client_lock.lock().await;
+        client_guard.as_ref()
+            .ok_or("ChromaDBクライアントが初期化されていません")?
+            .clone()
+    };
+    
+    // 検索対象の組織IDリストを決定
+    let org_ids: Vec<String> = match organization_id {
+        Some(id) if !id.is_empty() => {
+            vec![id]
+        },
+        _ => {
+            eprintln!("[find_similar_meeting_notes] organizationIdが未指定のため、すべての組織を検索します");
+            use crate::database::get_all_organizations;
+            match get_all_organizations() {
+                Ok(orgs) => {
+                    let ids: Vec<String> = orgs.into_iter().map(|o| o.id).collect();
+                    eprintln!("[find_similar_meeting_notes] 検索対象組織数: {}件", ids.len());
+                    ids
+                },
+                Err(e) => {
+                    eprintln!("[find_similar_meeting_notes] ⚠️ 組織一覧の取得に失敗しました: {}", e);
+                    return Ok(Vec::new());
+                },
+            }
+        },
+    };
+    
+    // 各組織のコレクションに対して検索を実行（並列実行）
+    let mut all_results = Vec::new();
+    let mut search_tasks = Vec::new();
+    
+    for org_id in org_ids {
+        let collection_name = if org_id.is_empty() {
+            "meetingNotes_all".to_string()
+        } else {
+            format!("meetingNotes_{}", org_id)
+        };
+        let client_clone = client.clone();
+        let embedding_clone = query_embedding.clone();
+        
+        let task = tokio::spawn(async move {
+            search_meeting_notes_in_collection(client_clone, &collection_name, embedding_clone, limit).await
+        });
+        search_tasks.push((org_id, task));
+    }
+    
+    // すべての検索タスクの完了を待つ
+    for (org_id, task) in search_tasks {
+        match task.await {
+            Ok(Ok(results)) => {
+                eprintln!("[find_similar_meeting_notes] 組織 '{}' から {}件の結果を取得", org_id, results.len());
+                all_results.extend(results);
+            },
+            Ok(Err(e)) => {
+                eprintln!("[find_similar_meeting_notes] ⚠️ 組織 '{}' の検索エラー: {}", org_id, e);
+            },
+            Err(e) => {
+                eprintln!("[find_similar_meeting_notes] ⚠️ 組織 '{}' の検索タスクエラー: {}", org_id, e);
+            },
+        }
+    }
+    
+    // 結果を類似度でソートして上位limit件を返す
+    all_results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+    let final_results: Vec<MeetingNoteSearchResult> = all_results.into_iter().take(limit).collect();
+    
+    eprintln!("[find_similar_meeting_notes] 最終結果: {}件の議事録を返します", final_results.len());
+    Ok(final_results)
 }

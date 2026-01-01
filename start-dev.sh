@@ -21,7 +21,7 @@ print_error() {
 
 # タイトル表示
 echo "=========================================="
-echo "  Network 開発環境起動"
+echo "  Demo App Local 開発環境起動"
 echo "=========================================="
 echo ""
 
@@ -59,7 +59,7 @@ fi
 
 # 開発サーバーを起動
 print_info "開発サーバーを起動しています..."
-print_info "ポート3020でNext.js開発サーバーが起動します"
+print_info "ポート3015でNext.js開発サーバーが起動します"
 print_info "Tauriアプリケーションが自動的に起動します"
 echo ""
 print_info "停止するには、Ctrl+C を押してください"

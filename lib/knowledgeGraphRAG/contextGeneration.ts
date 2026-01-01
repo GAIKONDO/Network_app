@@ -80,6 +80,7 @@ export async function getKnowledgeGraphContextWithResults(
       topicResultsCount: results.filter(r => r.type === 'topic').length,
       entityResultsCount: results.filter(r => r.type === 'entity').length,
       relationResultsCount: results.filter(r => r.type === 'relation').length,
+      meetingNoteResultsCount: results.filter(r => r.type === 'meetingNote').length,
     });
 
     if (results.length === 0) {
@@ -89,7 +90,7 @@ export async function getKnowledgeGraphContextWithResults(
     
     // 出典情報を収集（ファイル情報も含む）
     const sources: Array<{
-      type: 'entity' | 'relation' | 'topic';
+      type: 'entity' | 'relation' | 'topic' | 'meetingNote';
       id: string;
       name: string;
       score: number;
@@ -306,6 +307,43 @@ export async function getKnowledgeGraphContextWithResults(
       }
     } else {
       console.warn(`[getKnowledgeGraphContextWithResults] トピック検索結果が0件です。クエリ: "${queryText}"`);
+    }
+
+    // 議事録情報
+    const meetingNotes = results.filter(r => r.type === 'meetingNote' && r.meetingNote);
+    if (meetingNotes.length > 0) {
+      contextParts.push('\n## 関連議事録\n');
+      console.log(`[getKnowledgeGraphContextWithResults] 議事録情報をコンテキストに追加: ${meetingNotes.length}件`);
+      for (const result of meetingNotes.slice(0, limit)) {
+        const meetingNote = result.meetingNote!;
+        const scoreText = typeof result.score === 'number' && !isNaN(result.score)
+          ? ` (関連度: ${(result.score * 100).toFixed(1)}%)`
+          : '';
+        
+        const linkText = ` [議事録ページ: /organization/detail/meeting?meetingId=${meetingNote.id}]`;
+        contextParts.push(`- **${meetingNote.title}**${scoreText}${linkText}`);
+        
+        // 出典情報を追加
+        sources.push({
+          type: 'meetingNote',
+          id: meetingNote.id,
+          name: meetingNote.title,
+          score: typeof result.score === 'number' && !isNaN(result.score) ? result.score : 0,
+        });
+        
+        // 説明
+        if (meetingNote.description) {
+          contextParts.push(`  説明: ${meetingNote.description}`);
+        }
+        
+        // 内容の一部を表示（最大500文字）
+        if (meetingNote.content) {
+          const contentPreview = meetingNote.content.length > 500 
+            ? meetingNote.content.substring(0, 500) + '...'
+            : meetingNote.content;
+          contextParts.push(`  内容: ${contentPreview}`);
+        }
+      }
     }
 
     const context = contextParts.join('\n');

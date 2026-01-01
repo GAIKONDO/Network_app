@@ -72,12 +72,12 @@ export function ModelSelector({
             e.currentTarget.style.borderColor = 'transparent';
           }
         }}
-        title={`AIモデル: ${modelType === 'gpt' ? 'GPT' : modelType === 'gemini' ? 'Gemini' : modelType === 'claude' ? 'Claude' : 'ローカル'} - ${availableModels.find(m => m.value === selectedModel)?.label || selectedModel}`}
+        title={`AIモデル: ${modelType === 'gpt' ? 'GPT' : modelType === 'gemini' ? 'Gemini' : modelType === 'claude' ? 'Claude' : modelType === 'local-lfm' ? 'ローカル（LFM）' : 'ローカル'} - ${availableModels.find(m => m.value === selectedModel)?.label || selectedModel}`}
       >
         <FiCpu size={16} />
         {showModelSelector && (
           <span style={{ fontSize: '10px', fontWeight: 500 }}>
-            {modelType === 'gpt' ? 'GPT' : modelType === 'gemini' ? 'Gemini' : modelType === 'claude' ? 'Claude' : 'Local'}
+            {modelType === 'gpt' ? 'GPT' : modelType === 'gemini' ? 'Gemini' : modelType === 'claude' ? 'Claude' : modelType === 'local-lfm' ? 'LFM' : 'Local'}
           </span>
         )}
       </button>
@@ -118,7 +118,7 @@ export function ModelSelector({
               gap: '8px',
               flexWrap: 'wrap',
             }}>
-              {(['gpt', 'gemini', 'claude', 'local'] as const).map((type) => (
+              {(['gpt', 'gemini', 'claude', 'local', 'local-lfm'] as const).map((type) => (
                 <label
                   key={type}
                   style={{
@@ -144,7 +144,7 @@ export function ModelSelector({
                     style={{ cursor: 'pointer' }}
                   />
                   <span style={{ fontSize: '12px', fontWeight: 500, color: '#ffffff' }}>
-                    {type === 'gpt' ? 'GPT' : type === 'gemini' ? 'Gemini' : type === 'claude' ? 'Claude' : 'ローカル'}
+                    {type === 'gpt' ? 'GPT' : type === 'gemini' ? 'Gemini' : type === 'claude' ? 'Claude' : type === 'local-lfm' ? 'ローカル（LFM）' : 'ローカル'}
                   </span>
                 </label>
               ))}
@@ -166,7 +166,7 @@ export function ModelSelector({
                 <FiCpu size={14} />
                 <span>使用するAIモデル</span>
               </label>
-              {modelType === 'local' && loadingLocalModels && (
+              {(modelType === 'local' || modelType === 'local-lfm') && loadingLocalModels && (
                 <div style={{
                   padding: '8px',
                   backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -180,7 +180,7 @@ export function ModelSelector({
                   </p>
                 </div>
               )}
-              {modelType === 'local' && !loadingLocalModels && availableModels.length === 0 && (
+              {(modelType === 'local' || modelType === 'local-lfm') && !loadingLocalModels && availableModels.length === 0 && (
                 <div style={{
                   padding: '8px',
                   backgroundColor: 'rgba(239, 68, 68, 0.1)',

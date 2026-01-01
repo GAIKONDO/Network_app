@@ -2245,9 +2245,9 @@ pub fn init_database(app: &AppHandle) -> SqlResult<()> {
     
     // ローカル特化型用のデータベースディレクトリ
     let db_dir_name = if cfg!(debug_assertions) {
-        "network-mock-local-dev"
+        "demo-app-local-dev"
     } else {
-        "network-mock-local"
+        "demo-app-local"
     };
     let db_dir = app_data_dir.join(db_dir_name);
     if let Err(e) = std::fs::create_dir_all(&db_dir) {
@@ -2344,9 +2344,9 @@ pub async fn init_chromadb(app: &AppHandle) -> Result<(), String> {
         .map_err(|e| format!("アプリケーションデータディレクトリの取得に失敗しました: {}", e))?;
     
     let db_dir_name = if cfg!(debug_assertions) {
-        "network-mock-local-dev"
+        "demo-app-local-dev"
     } else {
-        "network-mock-local"
+        "demo-app-local"
     };
     
     let db_dir = app_data_dir.join(db_dir_name);

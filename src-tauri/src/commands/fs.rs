@@ -102,9 +102,9 @@ pub async fn save_topic_file(
 
     // データベースディレクトリ名（開発環境と本番環境で異なる）
     let db_dir_name = if cfg!(debug_assertions) {
-        "network-mock-local-dev"
+        "demo-app-local-dev"
     } else {
-        "network-mock-local"
+        "demo-app-local"
     };
 
     // ファイル保存ディレクトリのパスを構築（既存のimagesディレクトリを使用）
@@ -311,9 +311,9 @@ pub async fn save_graphviz_yaml_file_attachment(
 
     // データベースディレクトリ名（開発環境と本番環境で異なる）
     let db_dir_name = if cfg!(debug_assertions) {
-        "network-mock-local-dev"
+        "demo-app-local-dev"
     } else {
-        "network-mock-local"
+        "demo-app-local"
     };
 
     // ファイル保存ディレクトリのパスを構築（Graphviz用）

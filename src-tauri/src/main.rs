@@ -219,6 +219,8 @@ fn main() {
             commands::chromadb::chromadb_delete_relation_embedding,
             commands::chromadb::chromadb_clear_data_dir,
             commands::chromadb::chromadb_delete_organization_collections,
+            commands::chromadb::chromadb_save_meeting_note_embedding,
+            commands::chromadb::chromadb_find_similar_meeting_notes,
             // システム設計ドキュメントセクション管理コマンド
             commands::design_doc::create_design_doc_section_cmd,
             commands::design_doc::update_design_doc_section_cmd,

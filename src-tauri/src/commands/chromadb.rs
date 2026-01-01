@@ -199,3 +199,29 @@ pub async fn chromadb_delete_organization_collections(
 ) -> Result<(), String> {
     chromadb::delete_organization_collections(organizationId).await
 }
+
+/// 議事録埋め込みを保存
+#[tauri::command]
+pub async fn chromadb_save_meeting_note_embedding(
+    meetingNoteId: String,
+    organizationId: String,
+    combinedEmbedding: Vec<f32>,
+    metadata: HashMap<String, Value>,
+) -> Result<(), String> {
+    chromadb::save_meeting_note_embedding(
+        meetingNoteId,
+        organizationId,
+        combinedEmbedding,
+        metadata,
+    ).await
+}
+
+/// 類似議事録を検索
+#[tauri::command]
+pub async fn chromadb_find_similar_meeting_notes(
+    queryEmbedding: Vec<f32>,
+    limit: usize,
+    organizationId: Option<String>,
+) -> Result<Vec<chromadb::MeetingNoteSearchResult>, String> {
+    chromadb::find_similar_meeting_notes(queryEmbedding, limit, organizationId).await
+}

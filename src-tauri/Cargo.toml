@@ -1,12 +1,12 @@
 [package]
-name = "network"
+name = "demo-app-local"
 version = "2.1.3"
-description = "Network - Network mock desktop application"
+description = "Demo App Local - Local demo desktop application"
 authors = ["you"]
 license = ""
 repository = ""
 edition = "2021"
-default-run = "network"
+default-run = "demo-app-local"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

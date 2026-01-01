@@ -37,9 +37,9 @@ pub async fn get_database_path(app: AppHandle) -> Result<String, String> {
         Ok(app_data_dir) => {
             // 開発環境と本番環境で異なるディレクトリを使用
             let db_dir_name = if cfg!(debug_assertions) {
-                "network-mock-local-dev"
+                "demo-app-local-dev"
             } else {
-                "network-mock-local"
+                "demo-app-local"
             };
             let db_dir = app_data_dir.join(db_dir_name);
             let db_path = db_dir.join("app.db");
@@ -143,9 +143,9 @@ pub async fn diagnose_database(app: AppHandle) -> Result<HashMap<String, String>
             
             // データベースディレクトリの確認（開発環境と本番環境で異なるディレクトリ）
             let db_dir_name = if cfg!(debug_assertions) {
-                "network-mock-local-dev"
+                "demo-app-local-dev"
             } else {
-                "network-mock-local"
+                "demo-app-local"
             };
             let db_dir = app_data_dir.join(db_dir_name);
             let db_dir_str = db_dir.display().to_string();

@@ -21,7 +21,7 @@ print_error() {
 
 # タイトル表示
 echo "=========================================="
-echo "  Network 開発環境起動"
+echo "  Demo App Local 開発環境起動"
 echo "=========================================="
 echo ""
 
@@ -49,7 +49,16 @@ if ! command -v cargo &> /dev/null; then
 fi
 
 # 依存関係がインストールされているか確認
+NEED_INSTALL=false
+
 if [ ! -d "node_modules" ]; then
+    NEED_INSTALL=true
+elif [ ! -f "node_modules/.bin/next" ]; then
+    print_info "nextコマンドが見つかりません。依存関係を再インストールします..."
+    NEED_INSTALL=true
+fi
+
+if [ "$NEED_INSTALL" = true ]; then
     print_info "依存関係をインストール中..."
     npm install
     if [ $? -ne 0 ]; then
@@ -63,7 +72,7 @@ fi
 
 # 開発サーバーを起動
 print_info "開発サーバーを起動しています..."
-print_info "ポート3020でNext.js開発サーバーが起動します"
+print_info "ポート3015でNext.js開発サーバーが起動します"
 print_info "Tauriアプリケーションが自動的に起動します"
 echo ""
 print_info "停止するには、このウィンドウで Ctrl+C を押してください"
